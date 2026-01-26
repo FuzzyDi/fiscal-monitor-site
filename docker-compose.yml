@@ -28,18 +28,64 @@ services:
       PORT: 3001
       NODE_ENV: production
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/fiscal_monitor
-      # ВАЖНО: задайте ADMIN_API_KEY в корневом .env (или через переменные окружения)
-      ADMIN_API_KEY: ${ADMIN_API_KEY}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-your-secret-admin-key-here}
       STALE_MINUTES: ${STALE_MINUTES:-15}
-      LOG_LEVEL: info
+      LOG_LEVEL: ${LOG_LEVEL:-info}
       HOST: "0.0.0.0"
+      # Telegram settings
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME}
+      TELEGRAM_SEND_DELAY_MS: ${TELEGRAM_SEND_DELAY_MS:-100}
+      PORTAL_URL: ${PORTAL_URL:-https://fiscaldrive.sbg.network}
+      SUPPORT_EMAIL: ${SUPPORT_EMAIL:-support@fiscaldrive.sbg.network}
     ports:
       - "3001:3001"
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
-    # Healthcheck уже задан в backend/Dockerfile (node -e ...). Здесь не дублируем.
+    command: node server.js
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  telegram-bot:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fiscal-monitor-telegram-bot
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/fiscal_monitor
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    command: node telegram-bot.js
+
+  notification-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fiscal-monitor-worker
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/fiscal_monitor
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME}
+      TELEGRAM_SEND_DELAY_MS: ${TELEGRAM_SEND_DELAY_MS:-100}
+      PORTAL_URL: ${PORTAL_URL:-https://fiscaldrive.sbg.network}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    command: node background-worker.js
 
   frontend:
     build:
