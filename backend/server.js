@@ -7,6 +7,10 @@ require('dotenv').config();
 const ingestRoutes = require('./routes/ingest');
 const adminRoutes = require('./routes/admin');
 const portalRoutes = require('./routes/portal');
+const adminTelegramRoutes = require('./routes/admin-telegram');
+const portalTelegramRoutes = require('./routes/portal-telegram');
+const adminAuth = require('./middleware/admin-auth');
+const portalAuth = require('./middleware/portal-auth');
 const logger = require('./utils/logger');
 
 const app = express();
@@ -80,6 +84,8 @@ app.get('/health', (req, res) => {
 app.use('/api/v1/fiscal', ingestRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/portal', portalRoutes);
+app.use('/api/v1/admin/telegram', adminAuth, adminTelegramRoutes);
+app.use('/api/v1/portal/telegram', portalAuth, portalTelegramRoutes);
 
 // 404 Handler
 app.use((req, res) => {

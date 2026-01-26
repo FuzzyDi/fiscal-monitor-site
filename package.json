@@ -13,11 +13,17 @@
     "build": "npm run build:backend && npm run build:frontend",
     "start:backend": "cd backend && npm start",
     "start:frontend": "cd frontend && npm start",
+    "start:telegram-bot": "cd backend && node telegram-bot.js",
+    "start:worker": "cd backend && node background-worker.js",
     "test": "cd backend && npm test",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
-    "db:init": "psql $DATABASE_URL -f backend/schema.sql"
+    "db:init": "psql $DATABASE_URL -f backend/schema.sql",
+    "pm2:start": "pm2 start backend/server.js --name fiscal-api && pm2 start backend/telegram-bot.js --name telegram-bot && pm2 start backend/background-worker.js --name notification-worker",
+    "pm2:stop": "pm2 stop fiscal-api telegram-bot notification-worker",
+    "pm2:restart": "pm2 restart fiscal-api telegram-bot notification-worker",
+    "pm2:logs": "pm2 logs"
   },
   "keywords": [
     "fiscal",

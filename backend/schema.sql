@@ -86,3 +86,184 @@ COMMENT ON COLUMN fiscal_last_state.state_key IS 'Unique key: shopInn:shopNumber
 COMMENT ON COLUMN fiscal_last_state.snapshot IS 'Complete POS snapshot in JSON format';
 COMMENT ON COLUMN fiscal_last_state.severity IS 'Max severity from alerts: CRITICAL, DANGER, WARN, INFO';
 COMMENT ON COLUMN fiscal_last_state.is_registered IS 'Whether the INN has an active registration';
+
+-- ====================================================================
+-- TELEGRAM NOTIFICATIONS SYSTEM
+-- ====================================================================
+
+-- Subscription requests (clients request activation)
+CREATE TABLE IF NOT EXISTS notification_subscription_requests (
+  id SERIAL PRIMARY KEY,
+  shop_inn TEXT NOT NULL REFERENCES registrations(shop_inn) ON DELETE CASCADE,
+  status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'approved', 'rejected'
+  requested_at TIMESTAMPTZ DEFAULT NOW(),
+  client_comment TEXT,
+  
+  -- Admin review fields
+  reviewed_by TEXT,
+  reviewed_at TIMESTAMPTZ,
+  admin_comment TEXT,
+  
+  -- Link to subscription if approved
+  subscription_id INTEGER,
+  
+  -- Only one pending request per INN
+  CONSTRAINT unique_pending_request UNIQUE (shop_inn, status) DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE INDEX IF NOT EXISTS idx_subscription_requests_status ON notification_subscription_requests(status, requested_at);
+CREATE INDEX IF NOT EXISTS idx_subscription_requests_inn ON notification_subscription_requests(shop_inn);
+
+-- Active subscriptions (admin-approved)
+CREATE TABLE IF NOT EXISTS notification_subscriptions (
+  id SERIAL PRIMARY KEY,
+  shop_inn TEXT NOT NULL REFERENCES registrations(shop_inn) ON DELETE CASCADE,
+  status VARCHAR(20) DEFAULT 'active', -- 'active', 'expired', 'cancelled'
+  started_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  
+  -- Admin approval info
+  approved_by TEXT,
+  approved_at TIMESTAMPTZ,
+  payment_note TEXT,
+  
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  
+  CONSTRAINT unique_active_subscription UNIQUE (shop_inn, status) WHERE status = 'active'
+);
+
+CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON notification_subscriptions(shop_inn, status);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_expires ON notification_subscriptions(expires_at) WHERE status = 'active';
+
+-- Notification preferences (client settings)
+CREATE TABLE IF NOT EXISTS notification_preferences (
+  id SERIAL PRIMARY KEY,
+  subscription_id INTEGER NOT NULL REFERENCES notification_subscriptions(id) ON DELETE CASCADE UNIQUE,
+  severity_filter TEXT[] DEFAULT ARRAY['DANGER', 'CRITICAL'],
+  notify_on_recovery BOOLEAN DEFAULT true,
+  notify_on_stale BOOLEAN DEFAULT true,
+  notify_on_return BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_preferences_subscription ON notification_preferences(subscription_id);
+
+-- Telegram connections (one active per subscription)
+CREATE TABLE IF NOT EXISTS telegram_connections (
+  id SERIAL PRIMARY KEY,
+  subscription_id INTEGER NOT NULL REFERENCES notification_subscriptions(id) ON DELETE CASCADE,
+  telegram_chat_id BIGINT NOT NULL,
+  telegram_chat_type VARCHAR(20), -- 'private', 'group', 'supergroup'
+  telegram_chat_title TEXT,
+  is_active BOOLEAN DEFAULT true,
+  connected_at TIMESTAMPTZ DEFAULT NOW(),
+  last_notification_at TIMESTAMPTZ,
+  
+  -- Only one active connection per subscription
+  CONSTRAINT unique_active_connection UNIQUE (subscription_id, is_active) WHERE is_active = true
+);
+
+CREATE INDEX IF NOT EXISTS idx_telegram_connections_active ON telegram_connections(subscription_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_telegram_connections_chat_id ON telegram_connections(telegram_chat_id);
+
+-- Telegram connect codes (one-time use, 10 min TTL)
+CREATE TABLE IF NOT EXISTS telegram_connect_codes (
+  id SERIAL PRIMARY KEY,
+  subscription_id INTEGER NOT NULL REFERENCES notification_subscriptions(id) ON DELETE CASCADE,
+  code CHAR(6) NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used BOOLEAN DEFAULT false,
+  used_at TIMESTAMPTZ,
+  telegram_chat_id BIGINT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_connect_codes_lookup ON telegram_connect_codes(code, expires_at, used);
+CREATE INDEX IF NOT EXISTS idx_connect_codes_subscription ON telegram_connect_codes(subscription_id);
+
+-- Notification cooldowns (anti-spam)
+CREATE TABLE IF NOT EXISTS notification_cooldowns (
+  id SERIAL PRIMARY KEY,
+  subscription_id INTEGER NOT NULL REFERENCES notification_subscriptions(id) ON DELETE CASCADE,
+  state_key TEXT NOT NULL,
+  last_notified_at TIMESTAMPTZ NOT NULL,
+  last_severity VARCHAR(20),
+  last_alert_hash VARCHAR(64),
+  
+  CONSTRAINT unique_cooldown UNIQUE (subscription_id, state_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cooldowns_lookup ON notification_cooldowns(subscription_id, state_key);
+
+-- Notification queue (pending notifications)
+CREATE TABLE IF NOT EXISTS notification_queue (
+  id SERIAL PRIMARY KEY,
+  subscription_id INTEGER NOT NULL REFERENCES notification_subscriptions(id) ON DELETE CASCADE,
+  state_key TEXT NOT NULL,
+  severity VARCHAR(20) NOT NULL,
+  event_type VARCHAR(50) NOT NULL, -- 'new_alert', 'severity_change', 'stale', 'recovery', 'return'
+  alert_summary TEXT,
+  shop_number INTEGER,
+  pos_number INTEGER,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  processed BOOLEAN DEFAULT false
+);
+
+CREATE INDEX IF NOT EXISTS idx_queue_pending ON notification_queue(subscription_id, processed, created_at);
+
+-- Notification history (sent notifications log)
+CREATE TABLE IF NOT EXISTS notification_history (
+  id SERIAL PRIMARY KEY,
+  connection_id INTEGER REFERENCES telegram_connections(id) ON DELETE SET NULL,
+  subscription_id INTEGER NOT NULL REFERENCES notification_subscriptions(id) ON DELETE CASCADE,
+  message_text TEXT NOT NULL,
+  alerts_count INTEGER DEFAULT 1,
+  sent_at TIMESTAMPTZ DEFAULT NOW(),
+  telegram_message_id BIGINT,
+  delivered BOOLEAN DEFAULT false,
+  error_message TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_history_subscription ON notification_history(subscription_id, sent_at);
+CREATE INDEX IF NOT EXISTS idx_history_sent_at ON notification_history(sent_at);
+
+-- Update triggers
+DROP TRIGGER IF EXISTS update_subscriptions_updated_at ON notification_subscriptions;
+CREATE TRIGGER update_subscriptions_updated_at
+  BEFORE UPDATE ON notification_subscriptions
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_preferences_updated_at ON notification_preferences;
+CREATE TRIGGER update_preferences_updated_at
+  BEFORE UPDATE ON notification_preferences
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- Auto-create preferences when subscription is created
+CREATE OR REPLACE FUNCTION create_default_preferences()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO notification_preferences (subscription_id)
+  VALUES (NEW.id);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS auto_create_preferences ON notification_subscriptions;
+CREATE TRIGGER auto_create_preferences
+  AFTER INSERT ON notification_subscriptions
+  FOR EACH ROW
+  EXECUTE FUNCTION create_default_preferences();
+
+-- Comments
+COMMENT ON TABLE notification_subscription_requests IS 'Client requests for Telegram notification activation';
+COMMENT ON TABLE notification_subscriptions IS 'Active Telegram notification subscriptions (admin-approved)';
+COMMENT ON TABLE notification_preferences IS 'Client notification settings';
+COMMENT ON TABLE telegram_connections IS 'Telegram chat connections (personal or group)';
+COMMENT ON TABLE telegram_connect_codes IS 'One-time connection codes (10 min TTL)';
+COMMENT ON TABLE notification_cooldowns IS 'Anti-spam cooldown tracking';
+COMMENT ON TABLE notification_queue IS 'Pending notifications to be sent';
+COMMENT ON TABLE notification_history IS 'Log of all sent notifications';
