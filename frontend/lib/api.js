@@ -113,7 +113,20 @@ export const adminApi = {
     axios.get(`${API_URL}/api/v1/admin/telegram/export/subscriptions`, {
       headers: { 'X-Admin-Key': key },
       responseType: 'blob'
-    })
+    }),
+
+  // Export state to Excel
+  exportState: (key, shopInn = null, shopNumber = null, severity = null) => {
+    const params = {};
+    if (shopInn) params.shopInn = shopInn;
+    if (shopNumber !== null && shopNumber !== undefined && String(shopNumber).trim() !== '') params.shopNumber = shopNumber;
+    if (severity) params.severity = severity;
+    return axios.get(`${API_URL}/api/v1/admin/export/state`, {
+      headers: { 'X-Admin-Key': key },
+      params,
+      responseType: 'blob'
+    });
+  }
 };
 
 // Portal API

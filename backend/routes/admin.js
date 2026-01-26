@@ -507,4 +507,157 @@ router.delete('/tokens/:token', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/v1/admin/export/state
+ * Export POS states to Excel
+ */
+router.get('/export/state', async (req, res) => {
+  try {
+    const ExcelJS = require('exceljs');
+    const { shopInn, shopNumber, severity } = req.query;
+    
+    // Build query
+    let query = `
+      SELECT 
+        fls.*,
+        r.title as registration_title,
+        r.is_active as registration_active
+      FROM fiscal_last_state fls
+      LEFT JOIN registrations r ON r.shop_inn = fls.shop_inn
+      WHERE 1=1
+    `;
+    const params = [];
+    let paramCount = 0;
+    
+    if (shopInn) {
+      paramCount++;
+      query += ` AND fls.shop_inn = $${paramCount}`;
+      params.push(shopInn);
+    }
+    
+    if (shopNumber !== undefined && shopNumber !== null && String(shopNumber).trim() !== '') {
+      paramCount++;
+      query += ` AND fls.shop_number = $${paramCount}`;
+      params.push(String(shopNumber).trim());
+    }
+    
+    if (severity) {
+      paramCount++;
+      query += ` AND fls.severity = $${paramCount}`;
+      params.push(severity.toUpperCase());
+    }
+    
+    query += ` ORDER BY fls.shop_inn, fls.shop_number, fls.pos_number`;
+    
+    const result = await pool.query(query, params);
+    
+    // Create workbook
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Fiscal Monitor';
+    workbook.created = new Date();
+    
+    const sheet = workbook.addWorksheet('POS State');
+    
+    // Define columns
+    sheet.columns = [
+      { header: 'ИНН', key: 'shop_inn', width: 15 },
+      { header: 'Компания', key: 'registration_title', width: 30 },
+      { header: 'Магазин №', key: 'shop_number', width: 12 },
+      { header: 'Касса №', key: 'pos_number', width: 12 },
+      { header: 'Название', key: 'shop_name', width: 25 },
+      { header: 'IP адрес', key: 'pos_ip', width: 15 },
+      { header: 'Важность', key: 'severity', width: 12 },
+      { header: 'Обновлено', key: 'updated_at', width: 20 },
+      { header: 'Зарегистрирован', key: 'is_registered', width: 15 },
+      { header: 'Terminal ID', key: 'terminal_id', width: 20 },
+      { header: 'Чеков', key: 'receipt_count', width: 12 },
+      { header: 'Макс. чеков', key: 'receipt_max', width: 12 },
+      { header: 'Не отправлено', key: 'unsent_count', width: 14 },
+      { header: 'Z-отчётов', key: 'z_count', width: 12 },
+      { header: 'Макс. Z', key: 'z_max', width: 12 },
+      { header: 'Осталось Z', key: 'z_remaining', width: 12 },
+      { header: 'Алерты', key: 'alerts', width: 50 }
+    ];
+    
+    // Add data rows
+    result.rows.forEach(row => {
+      const snapshot = row.snapshot || {};
+      const fiscal = snapshot.fiscal || {};
+      const alerts = snapshot.alerts || [];
+      
+      sheet.addRow({
+        shop_inn: row.shop_inn,
+        registration_title: row.registration_title || '-',
+        shop_number: row.shop_number || '0',
+        pos_number: row.pos_number || '0',
+        shop_name: row.shop_name || '-',
+        pos_ip: row.pos_ip || '-',
+        severity: row.severity || 'INFO',
+        updated_at: row.updated_at,
+        is_registered: row.is_registered ? 'Да' : 'Нет',
+        terminal_id: fiscal.terminalId || '-',
+        receipt_count: fiscal.receiptCount ?? '-',
+        receipt_max: fiscal.receiptMaxCount ?? '-',
+        unsent_count: fiscal.unsentCount ?? '-',
+        z_count: fiscal.zReportCount ?? fiscal.zCount ?? '-',
+        z_max: fiscal.zReportMaxCount ?? fiscal.zMax ?? '-',
+        z_remaining: fiscal.zRemaining ?? '-',
+        alerts: alerts.map(a => `[${a.severity}] ${a.type}: ${a.message || ''}`).join('; ') || '-'
+      });
+    });
+    
+    // Style header row
+    sheet.getRow(1).font = { bold: true };
+    sheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF4472C4' }
+    };
+    sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    
+    // Apply severity colors
+    sheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return; // Skip header
+      
+      const severity = row.getCell('severity').value;
+      let fillColor = 'FFFFFFFF';
+      
+      switch (severity) {
+        case 'CRITICAL':
+          fillColor = 'FFFF0000'; // Red
+          break;
+        case 'DANGER':
+          fillColor = 'FFFFA500'; // Orange
+          break;
+        case 'WARN':
+          fillColor = 'FFFFFF00'; // Yellow
+          break;
+        case 'INFO':
+          fillColor = 'FF90EE90'; // Light green
+          break;
+      }
+      
+      row.getCell('severity').fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: fillColor }
+      };
+    });
+    
+    // Set response headers
+    const filename = `pos_state_${new Date().toISOString().split('T')[0]}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    
+    // Write to response
+    await workbook.xlsx.write(res);
+    res.end();
+    
+    logger.info('State exported to Excel');
+  } catch (err) {
+    logger.error('Error exporting state:', err);
+    res.status(500).json({ error: 'Failed to export state' });
+  }
+});
+
 module.exports = router;

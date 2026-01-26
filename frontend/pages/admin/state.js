@@ -9,6 +9,7 @@ export default function AdminState() {
   const [loading, setLoading] = useState(true);
   const [selectedInn, setSelectedInn] = useState('');
   const [selectedShopNumber, setSelectedShopNumber] = useState('');
+  const [exporting, setExporting] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -63,6 +64,43 @@ export default function AdminState() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      setExporting(true);
+      const adminKey = localStorage.getItem('adminKey');
+      if (!adminKey) {
+        router.push('/admin/login');
+        return;
+      }
+
+      const { inn, shopNumber, severity } = router.query;
+      const response = await adminApi.exportState(adminKey, inn, shopNumber, severity);
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Generate filename with current date and filters
+      let filename = 'pos_state_';
+      if (inn) filename += `inn_${inn}_`;
+      if (shopNumber) filename += `shop_${shopNumber}_`;
+      if (severity) filename += `${severity.toLowerCase()}_`;
+      filename += `${new Date().toISOString().split('T')[0]}.xlsx`;
+      
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Не удалось экспортировать данные');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -224,17 +262,41 @@ export default function AdminState() {
             <h2 className="text-xl font-semibold text-white">
               {states.length} POS Terminal{states.length !== 1 ? 's' : ''}
             </h2>
-            {(selectedInn || selectedShopNumber || router.query.severity) && (
+            <div className="flex items-center gap-3">
               <button
-                onClick={() => router.push('/admin/state')}
-                className="text-white hover:text-blue-100 text-sm font-medium inline-flex items-center transition-colors bg-white bg-opacity-20 px-3 py-1 rounded-lg"
+                onClick={handleExportExcel}
+                disabled={exporting || states.length === 0}
+                className="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-lg text-sm font-medium inline-flex items-center transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                Clear Filters
+                {exporting ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Экспорт...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Экспорт в Excel
+                  </>
+                )}
               </button>
-            )}
+              {(selectedInn || selectedShopNumber || router.query.severity) && (
+                <button
+                  onClick={() => router.push('/admin/state')}
+                  className="text-white hover:text-blue-100 text-sm font-medium inline-flex items-center transition-colors bg-white bg-opacity-20 px-3 py-1 rounded-lg"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Clear Filters
+                </button>
+              )}
+            </div>
           </div>
           <div className="divide-y divide-gray-200">
             {states.map((state) => (
