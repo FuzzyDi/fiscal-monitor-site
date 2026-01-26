@@ -1,5 +1,5 @@
-# Telegram Tables Migration
-# Extract from backend/schema.sql (lines 90-269)
+-- Telegram Tables Migration
+-- Extract from backend/schema.sql (lines 90-269)
 
 -- ====================================================================
 -- TELEGRAM NOTIFICATIONS SYSTEM
