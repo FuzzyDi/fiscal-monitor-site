@@ -244,9 +244,20 @@ export default function Portal() {
                   )}
                 </div>
               </div>
-              <button
-                onClick={handleLogout}
-                className="text-gray-600 hover:text-gray-900 font-medium inline-flex items-center px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => router.push('/portal/telegram')}
+                  className="text-blue-600 hover:text-blue-800 font-medium inline-flex items-center px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+                >
+                  <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.223-.548.223l.188-2.85 5.18-4.68c.223-.198-.054-.308-.346-.11l-6.4 4.03-2.76-.918c-.6-.187-.612-.6.125-.89l10.782-4.156c.5-.18.94.12.78.89z"/>
+                  </svg>
+                  Telegram
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="text-gray-600 hover:text-gray-900 font-medium inline-flex items-center px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                >
               >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
