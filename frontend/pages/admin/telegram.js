@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '../../components/AdminLayout';
 import api from '../../lib/api';
 
@@ -8,11 +8,7 @@ export default function TelegramSubscriptions() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('requests');
 
-  useEffect(() => {
-    loadData();
-  }, [activeTab]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       if (activeTab === 'requests') {
@@ -27,7 +23,11 @@ export default function TelegramSubscriptions() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleApprove = async (requestId, duration) => {
     if (!confirm('Активировать подписку на Telegram уведомления?')) return;

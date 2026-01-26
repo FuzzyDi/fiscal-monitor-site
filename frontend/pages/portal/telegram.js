@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 
 export default function TelegramSettings() {
@@ -13,11 +13,7 @@ export default function TelegramSettings() {
     notify_on_return: true
   });
 
-  useEffect(() => {
-    loadStatus();
-  }, []);
-
-  const loadStatus = async () => {
+  const loadStatus = useCallback(async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('portalToken');
@@ -46,7 +42,11 @@ export default function TelegramSettings() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    loadStatus();
+  }, [loadStatus]);
 
   const handleRequestSubscription = async () => {
     const comment = prompt('Комментарий к запросу (опционально):');
