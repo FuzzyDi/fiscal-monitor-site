@@ -1,0 +1,27 @@
+# Cloudflared Configuration for the sbg.network zone
+#
+# Goal:
+# - fiscaldrive.sbg.network -> this project (unified endpoint) (http://localhost:8080)
+#
+# Save this as:
+#   C:\Users\YOUR_USERNAME\.cloudflared\config.yml
+#
+# Replace YOUR_TUNNEL_ID with the actual tunnel ID.
+
+tunnel: YOUR_TUNNEL_ID
+credentials-file: C:\Users\YOUR_USERNAME\.cloudflared\YOUR_TUNNEL_ID.json
+
+ingress:
+  # Project: Fiscal Monitor (recommended public hostname)
+  - hostname: fiscaldrive.sbg.network
+    service: http://localhost:8080
+
+  # Optional: explicit API hostname for the same project (if you want to use it)
+  - hostname: api.fiscaldrive.sbg.network
+    service: http://localhost:8080
+
+  # Catch-all rule (required, must be last)
+  - service: http_status:404
+
+# Optional: configure logging
+# loglevel: info

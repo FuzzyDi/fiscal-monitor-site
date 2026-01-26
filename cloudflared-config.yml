@@ -1,0 +1,26 @@
+# Cloudflare Tunnel Configuration (multi-hostname)
+#
+# This template assumes you run the unified endpoint locally:
+# - Project (unified): http://localhost:8080  (docker-compose service: nginx)
+#
+# Put this file at:
+#   C:\Users\YOUR_USERNAME\.cloudflared\config.yml
+#
+# You can use either tunnel NAME or tunnel ID.
+# If you specify NAME here, credentials-file must point to the actual JSON file created by cloudflared.
+
+tunnel: fiscal-monitor
+credentials-file: C:\Users\YOUR_USERNAME\.cloudflared\TUNNEL_ID.json
+
+ingress:
+  - hostname: fiscaldrive.sbg.network
+    service: http://localhost:8080
+
+  - hostname: api.fiscaldrive.sbg.network
+    service: http://localhost:8080
+
+  - service: http_status:404
+
+originRequest:
+  connectTimeout: 30s
+  noTLSVerify: false

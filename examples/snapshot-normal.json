@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "eventType": "HEARTBEAT",
+  "eventTime": 1737383400000,
+  "shopInn": "123456789",
+  "shopNumber": 101,
+  "shopName": "SBG Store",
+  "posNumber": 4,
+  "posIp": "192.168.77.24",
+  "severity": "INFO",
+  "alerts": [],
+  "fiscal": {
+    "factoryId": "00050000060c0a00cb22000e005600680000",
+    "terminalId": "UZ210317212268",
+    "unsentCount": 0,
+    "zRemaining": 538
+  }
+}

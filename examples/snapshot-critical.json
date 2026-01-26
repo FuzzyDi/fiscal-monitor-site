@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "eventType": "STATUS_UPDATE",
+  "eventTime": 1737383400000,
+  "shopInn": "123456789",
+  "shopNumber": 101,
+  "shopName": "SBG Store",
+  "posNumber": 4,
+  "posIp": "192.168.77.24",
+  "severity": "CRITICAL",
+  "alerts": [
+    {
+      "type": "UNSENT_CRITICAL",
+      "severity": "CRITICAL",
+      "message": "CRITICAL: 25 unsent documents (>=20)",
+      "value": 25
+    },
+    {
+      "type": "Z_REMAINING_CRITICAL",
+      "severity": "CRITICAL",
+      "message": "CRITICAL: only 2 shifts remaining (<=2)",
+      "value": 2
+    },
+    {
+      "type": "FM_FILL_DANGER",
+      "severity": "DANGER",
+      "message": "Danger: FM memory 35% full",
+      "value": 35
+    }
+  ],
+  "fiscal": {
+    "factoryId": "00050000060c0a00cb22000e005600680000",
+    "terminalId": "UZ210317212268",
+    "unsentCount": 25,
+    "zRemaining": 2
+  }
+}
