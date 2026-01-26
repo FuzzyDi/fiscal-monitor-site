@@ -48,7 +48,7 @@ router.get('/requests', async (req, res) => {
 
 // POST /api/v1/admin/telegram/approve-request/:requestId - Одобрить запрос
 router.post('/approve-request/:requestId', async (req, res) => {
-  const client = await db.pool.connect();
+  const client = await db.connect();
   
   try {
     const { requestId } = req.params;
