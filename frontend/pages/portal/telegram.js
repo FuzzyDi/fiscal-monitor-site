@@ -199,16 +199,16 @@ export default function TelegramSettings() {
             <div>
               <div className="flex items-center gap-4 mb-4">
                 <span className={`px-3 py-1 rounded ${
-                  status.subscription.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  status.subscription.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                 }`}>
-                  {status.subscription.is_active ? '✓ Активна' : 'Истекла'}
+                  {status.subscription.status === 'active' ? '✓ Активна' : 'Истекла'}
                 </span>
                 <span className="text-gray-600">
                   до {new Date(status.subscription.expires_at).toLocaleDateString('ru')}
                 </span>
               </div>
               
-              {status.subscription.is_active && new Date(status.subscription.expires_at) - new Date() < 7 * 24 * 60 * 60 * 1000 && (
+              {status.subscription.status === 'active' && new Date(status.subscription.expires_at) - new Date() < 7 * 24 * 60 * 60 * 1000 && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded p-4 mb-4">
                   <p className="text-yellow-800">
                     ⚠️ Подписка истекает через {Math.ceil((new Date(status.subscription.expires_at) - new Date()) / (1000 * 60 * 60 * 24))} дней
@@ -223,11 +223,11 @@ export default function TelegramSettings() {
         </div>
 
         {/* Telegram Connection */}
-        {status?.subscription?.is_active && (
+        {status?.subscription?.status === 'active' && (
           <div className="bg-white rounded-lg shadow p-6 mb-6">
             <h2 className="text-xl font-semibold mb-4">Подключение Telegram</h2>
             
-            {!status.telegram_connected ? (
+            {!status.connection ? (
               <div>
                 {!connectCode ? (
                   <div>
@@ -278,9 +278,9 @@ export default function TelegramSettings() {
                   <p className="text-green-800 font-semibold">
                     ✓ Telegram подключен
                   </p>
-                  {status.telegram_chat_type === 'group' && (
+                  {status.connection?.telegram_chat_type === 'group' && (
                     <p className="text-sm text-green-600 mt-2">
-                      Группа: {status.telegram_chat_title}
+                      Группа: {status.connection?.telegram_chat_title}
                     </p>
                   )}
                 </div>
@@ -296,7 +296,7 @@ export default function TelegramSettings() {
         )}
 
         {/* Notification Preferences */}
-        {status?.subscription?.is_active && status?.telegram_connected && (
+        {status?.subscription?.status === 'active' && status?.connection && (
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold mb-4">Настройки уведомлений</h2>
             
