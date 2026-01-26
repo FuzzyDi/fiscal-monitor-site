@@ -11,6 +11,9 @@ RUN npm install
 # Copy application files
 COPY . .
 
+# Ensure public directory exists
+RUN mkdir -p public
+
 # Build the application
 RUN npm run build
 
@@ -29,9 +32,13 @@ RUN npm install --production
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/next.config.js ./
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/pages ./pages
 
 # Expose port
 EXPOSE 3000
+
+# Set hostname to 0.0.0.0
+ENV HOSTNAME="0.0.0.0"
 
 # Start the application
 CMD ["npm", "start"]
