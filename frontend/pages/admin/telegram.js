@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '../../components/AdminLayout';
-import api from '../../lib/api';
+import { adminApi } from '../../lib/api';
 
 export default function TelegramSubscriptions() {
   const [requests, setRequests] = useState([]);
@@ -11,11 +11,17 @@ export default function TelegramSubscriptions() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
+      const adminKey = localStorage.getItem('adminKey');
+      if (!adminKey) {
+        alert('Not authenticated');
+        return;
+      }
+
       if (activeTab === 'requests') {
-        const res = await api.get('/admin/telegram/requests?status=pending');
+        const res = await adminApi.getTelegramRequests(adminKey, 'pending');
         setRequests(res.data.requests || []);
       } else {
-        const res = await api.get('/admin/telegram/subscriptions');
+        const res = await adminApi.getTelegramSubscriptions(adminKey);
         setSubscriptions(res.data.subscriptions || []);
       }
     } catch (error) {
@@ -33,7 +39,8 @@ export default function TelegramSubscriptions() {
     if (!confirm('Активировать подписку на Telegram уведомления?')) return;
     
     try {
-      await api.post(`/admin/telegram/approve-request/${requestId}`, {
+      const adminKey = localStorage.getItem('adminKey');
+      await adminApi.approveTelegramRequest(adminKey, requestId, {
         duration_months: duration
       });
       alert('Подписка активирована!');
@@ -47,7 +54,8 @@ export default function TelegramSubscriptions() {
     const comment = prompt('Причина отклонения (опционально):');
     
     try {
-      await api.post(`/admin/telegram/reject-request/${requestId}`, {
+      const adminKey = localStorage.getItem('adminKey');
+      await adminApi.rejectTelegramRequest(adminKey, requestId, {
         admin_comment: comment || reason
       });
       alert('Запрос отклонён');
@@ -61,7 +69,8 @@ export default function TelegramSubscriptions() {
     if (!confirm(`Продлить подписку на ${months} мес?`)) return;
     
     try {
-      await api.post(`/admin/telegram/extend-subscription/${subscriptionId}`, {
+      const adminKey = localStorage.getItem('adminKey');
+      await adminApi.extendTelegramSubscription(adminKey, subscriptionId, {
         duration_months: months
       });
       alert('Подписка продлена!');
@@ -75,7 +84,8 @@ export default function TelegramSubscriptions() {
     if (!confirm('Отменить подписку? Клиент перестанет получать уведомления.')) return;
     
     try {
-      await api.post(`/admin/telegram/cancel-subscription/${subscriptionId}`);
+      const adminKey = localStorage.getItem('adminKey');
+      await adminApi.cancelTelegramSubscription(adminKey, subscriptionId);
       alert('Подписка отменена');
       loadData();
     } catch (error) {
@@ -85,9 +95,8 @@ export default function TelegramSubscriptions() {
 
   const handleExport = async () => {
     try {
-      const response = await api.get('/admin/telegram/export/subscriptions', {
-        responseType: 'blob'
-      });
+      const adminKey = localStorage.getItem('adminKey');
+      const response = await adminApi.exportTelegramSubscriptions(adminKey);
       
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');

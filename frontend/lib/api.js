@@ -75,6 +75,44 @@ export const adminApi = {
   revokeToken: (key, token) =>
     axios.delete(`${API_URL}/api/v1/admin/tokens/${encodeURIComponent(token)}`, {
       headers: { 'X-Admin-Key': key }
+    }),
+
+  // Telegram methods
+  getTelegramRequests: (key, status = 'pending') =>
+    axios.get(`${API_URL}/api/v1/admin/telegram/requests`, {
+      headers: { 'X-Admin-Key': key },
+      params: { status }
+    }),
+
+  getTelegramSubscriptions: (key) =>
+    axios.get(`${API_URL}/api/v1/admin/telegram/subscriptions`, {
+      headers: { 'X-Admin-Key': key }
+    }),
+
+  approveTelegramRequest: (key, requestId, data) =>
+    axios.post(`${API_URL}/api/v1/admin/telegram/approve-request/${requestId}`, data, {
+      headers: { 'X-Admin-Key': key }
+    }),
+
+  rejectTelegramRequest: (key, requestId, data) =>
+    axios.post(`${API_URL}/api/v1/admin/telegram/reject-request/${requestId}`, data, {
+      headers: { 'X-Admin-Key': key }
+    }),
+
+  extendTelegramSubscription: (key, subscriptionId, data) =>
+    axios.post(`${API_URL}/api/v1/admin/telegram/extend-subscription/${subscriptionId}`, data, {
+      headers: { 'X-Admin-Key': key }
+    }),
+
+  cancelTelegramSubscription: (key, subscriptionId) =>
+    axios.post(`${API_URL}/api/v1/admin/telegram/cancel-subscription/${subscriptionId}`, {}, {
+      headers: { 'X-Admin-Key': key }
+    }),
+
+  exportTelegramSubscriptions: (key) =>
+    axios.get(`${API_URL}/api/v1/admin/telegram/export/subscriptions`, {
+      headers: { 'X-Admin-Key': key },
+      responseType: 'blob'
     })
 };
 
