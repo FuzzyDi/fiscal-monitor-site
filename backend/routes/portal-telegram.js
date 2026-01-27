@@ -340,22 +340,24 @@ router.put('/preferences', async (req, res) => {
 
     const subscriptionId = subResult.rows[0].id;
 
-    // Обновить настройки
+    // Обновить или создать настройки (UPSERT)
     await db.query(`
-      UPDATE notification_preferences
-      SET 
-        severity_filter = $1,
-        notify_on_recovery = $2,
-        notify_on_stale = $3,
-        notify_on_return = $4,
+      INSERT INTO notification_preferences 
+        (subscription_id, severity_filter, notify_on_recovery, notify_on_stale, notify_on_return)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (subscription_id) 
+      DO UPDATE SET
+        severity_filter = EXCLUDED.severity_filter,
+        notify_on_recovery = EXCLUDED.notify_on_recovery,
+        notify_on_stale = EXCLUDED.notify_on_stale,
+        notify_on_return = EXCLUDED.notify_on_return,
         updated_at = NOW()
-      WHERE subscription_id = $5
     `, [
+      subscriptionId,
       severity_filter,
       notify_on_recovery !== undefined ? notify_on_recovery : true,
       notify_on_stale !== undefined ? notify_on_stale : true,
-      notify_on_return !== undefined ? notify_on_return : true,
-      subscriptionId
+      notify_on_return !== undefined ? notify_on_return : true
     ]);
 
     logger.info(`Telegram preferences updated: ${shopInn}`);
