@@ -187,7 +187,7 @@ function RequestsTable({ requests, onApprove, onReject }) {
                 <div className="flex gap-2">
                   <select 
                     onChange={(e) => onApprove(req.id, parseInt(e.target.value))}
-                    className="border rounded px-2 py-1 text-sm"
+                    className="border rounded px-2 py-1 text-sm text-gray-900"
                     defaultValue=""
                   >
                     <option value="" disabled>Одобрить...</option>

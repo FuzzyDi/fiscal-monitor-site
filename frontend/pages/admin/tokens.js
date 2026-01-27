@@ -243,7 +243,7 @@ export default function AdminTokens() {
                   <select
                     value={formData.shopInn}
                     onChange={(e) => setFormData({ ...formData, shopInn: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                     required
                   >
                     <option value="">Select INN</option>
@@ -268,7 +268,7 @@ export default function AdminTokens() {
                     value={formData.label}
                     onChange={(e) => setFormData({ ...formData, label: e.target.value })}
                     placeholder="e.g., Production Token, Test Access"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                     required
                   />
                 </div>
@@ -320,7 +320,7 @@ export default function AdminTokens() {
                     type="text"
                     value={editLabel}
                     onChange={(e) => setEditLabel(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                     required
                     autoFocus
                   />
