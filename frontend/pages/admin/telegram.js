@@ -114,7 +114,7 @@ export default function TelegramSubscriptions() {
     <AdminLayout>
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Telegram Уведомления</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Telegram Уведомления</h1>
           <button
             onClick={handleExport}
             className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
@@ -140,7 +140,7 @@ export default function TelegramSubscriptions() {
         </div>
 
         {loading ? (
-          <div className="text-center py-8">Загрузка...</div>
+          <div className="text-center py-8 text-gray-700">Загрузка...</div>
         ) : activeTab === 'requests' ? (
           <RequestsTable 
             requests={requests} 
@@ -179,9 +179,9 @@ function RequestsTable({ requests, onApprove, onReject }) {
         <tbody className="divide-y divide-gray-200">
           {requests.map((req) => (
             <tr key={req.id}>
-              <td className="px-6 py-4">{req.registration_title}</td>
-              <td className="px-6 py-4 font-mono">{req.shop_inn}</td>
-              <td className="px-6 py-4">{new Date(req.requested_at).toLocaleString('ru')}</td>
+              <td className="px-6 py-4 text-gray-900">{req.company_name || req.registration_title || '-'}</td>
+              <td className="px-6 py-4 font-mono text-gray-700">{req.shop_inn}</td>
+              <td className="px-6 py-4 text-gray-700">{new Date(req.requested_at).toLocaleString('ru')}</td>
               <td className="px-6 py-4 text-sm text-gray-600">{req.client_comment || '-'}</td>
               <td className="px-6 py-4">
                 <div className="flex gap-2">
@@ -237,8 +237,8 @@ function SubscriptionsTable({ subscriptions, onExtend, onCancel }) {
             
             return (
               <tr key={sub.id}>
-                <td className="px-6 py-4">{sub.registration_title}</td>
-                <td className="px-6 py-4 font-mono">{sub.shop_inn}</td>
+                <td className="px-6 py-4 text-gray-900">{sub.company_name || sub.registration_title || '-'}</td>
+                <td className="px-6 py-4 font-mono text-gray-700">{sub.shop_inn}</td>
                 <td className="px-6 py-4">
                   <span className={`px-2 py-1 rounded text-xs ${
                     sub.status === 'active' && !isExpired ? 'bg-green-100 text-green-800' : 
@@ -247,7 +247,7 @@ function SubscriptionsTable({ subscriptions, onExtend, onCancel }) {
                     {sub.status === 'active' && !isExpired ? 'Активна' : 'Истекла'}
                   </span>
                 </td>
-                <td className="px-6 py-4">
+                <td className="px-6 py-4 text-gray-700">
                   {new Date(sub.expires_at).toLocaleDateString('ru')}
                   {!isExpired && (
                     <span className="text-xs text-gray-500 ml-2">
