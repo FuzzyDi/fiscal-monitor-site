@@ -167,6 +167,8 @@ export default function TelegramSettings() {
 
       if (response.ok) {
         alert('Настройки сохранены');
+        // Перезагрузить страницу для обновления данных
+        window.location.reload();
       } else {
         const data = await response.json();
         alert('Ошибка: ' + data.error);
