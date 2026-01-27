@@ -76,11 +76,16 @@ router.get('/status', async (req, res) => {
         expires_at: subscription.expires_at
       },
       connection: connResult.rows[0] || null,
-      preferences: {
+      preferences: subscription.severity_filter ? {
         severity_filter: subscription.severity_filter,
-        notify_on_recovery: subscription.notify_on_recovery,
-        notify_on_stale: subscription.notify_on_stale,
-        notify_on_return: subscription.notify_on_return
+        notify_on_recovery: subscription.notify_on_recovery !== null ? subscription.notify_on_recovery : true,
+        notify_on_stale: subscription.notify_on_stale !== null ? subscription.notify_on_stale : true,
+        notify_on_return: subscription.notify_on_return !== null ? subscription.notify_on_return : true
+      } : {
+        severity_filter: ['DANGER', 'CRITICAL'],
+        notify_on_recovery: true,
+        notify_on_stale: true,
+        notify_on_return: true
       },
       active_code: codeResult.rows[0] || null
     });
