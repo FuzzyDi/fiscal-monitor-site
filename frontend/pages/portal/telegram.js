@@ -35,7 +35,25 @@ export default function TelegramSettings() {
       setStatus(data);
       
       if (data.preferences) {
-        setPreferences(data.preferences);
+        // Преобразовать массив severity_filter обратно в строку для UI
+        let severityString = 'DANGER'; // default
+        if (Array.isArray(data.preferences.severity_filter)) {
+          const severities = data.preferences.severity_filter;
+          if (severities.length === 1 && severities[0] === 'CRITICAL') {
+            severityString = 'CRITICAL';
+          } else if (severities.includes('INFO')) {
+            severityString = 'INFO';
+          } else if (severities.includes('WARN')) {
+            severityString = 'WARN';
+          } else if (severities.includes('DANGER')) {
+            severityString = 'DANGER';
+          }
+        }
+        
+        setPreferences({
+          ...data.preferences,
+          severity_filter: severityString
+        });
       }
     } catch (error) {
       console.error('Failed to load status:', error);
@@ -122,13 +140,27 @@ export default function TelegramSettings() {
   const handleSavePreferences = async () => {
     try {
       const token = localStorage.getItem('portalToken');
+      
+      // Преобразовать severity_filter в массив
+      const severityMap = {
+        'CRITICAL': ['CRITICAL'],
+        'DANGER': ['DANGER', 'CRITICAL'],
+        'WARN': ['WARN', 'DANGER', 'CRITICAL'],
+        'INFO': ['INFO', 'WARN', 'DANGER', 'CRITICAL']
+      };
+      
+      const severityArray = severityMap[preferences.severity_filter] || ['DANGER', 'CRITICAL'];
+      
       const response = await fetch('/api/v1/portal/telegram/preferences', {
         method: 'PUT',
         headers: {
           'X-Token': token,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(preferences)
+        body: JSON.stringify({
+          ...preferences,
+          severity_filter: severityArray
+        })
       });
 
       if (response.ok) {
@@ -308,7 +340,7 @@ export default function TelegramSettings() {
                 <select
                   value={preferences.severity_filter}
                   onChange={(e) => setPreferences({...preferences, severity_filter: e.target.value})}
-                  className="w-full border rounded px-3 py-2"
+                  className="w-full border rounded px-3 py-2 text-gray-900"
                 >
                   <option value="INFO">Все уведомления (INFO и выше)</option>
                   <option value="WARN">Предупреждения (WARN и выше)</option>
