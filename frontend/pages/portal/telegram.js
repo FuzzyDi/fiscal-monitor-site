@@ -38,16 +38,18 @@ export default function TelegramSettings() {
         // Преобразовать массив severity_filter обратно в строку для UI
         let severityString = 'DANGER'; // default
         if (Array.isArray(data.preferences.severity_filter)) {
-          const severities = data.preferences.severity_filter;
-          if (severities.length === 1 && severities[0] === 'CRITICAL') {
-            severityString = 'CRITICAL';
-          } else if (severities.includes('INFO')) {
-            severityString = 'INFO';
-          } else if (severities.includes('WARN')) {
-            severityString = 'WARN';
-          } else if (severities.includes('DANGER')) {
-            severityString = 'DANGER';
-          }
+          const severities = data.preferences.severity_filter.sort();
+          const severityKey = severities.join(',');
+          
+          // Точное сопоставление массивов
+          const severityMap = {
+            'CRITICAL': 'CRITICAL',
+            'CRITICAL,DANGER': 'DANGER',
+            'CRITICAL,DANGER,WARN': 'WARN',
+            'CRITICAL,DANGER,INFO,WARN': 'INFO'
+          };
+          
+          severityString = severityMap[severityKey] || 'DANGER';
         }
         
         setPreferences({
