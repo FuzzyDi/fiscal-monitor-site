@@ -29,42 +29,48 @@ Chat Type: private
 
 ### **Способ 1: Отправить Тестовый Snapshot (Рекомендуется)**
 
-Отправим тестовый snapshot с проблемой через API `/api/v1/ingest`:
+Отправим тестовый snapshot с проблемой через API `/api/v1/fiscal/snapshot`:
 
 ```powershell
-# Токен для INN 311030320
-$token = "85fbd14d9b2f33fcbc955789bd1d1677253f170b4aa70b5adf9adaee58d16f37"
-
 # Создать тестовый snapshot с ошибкой
 $snapshot = @{
-    shop_inn = "311030320"
-    shop_number = "1"
-    shop_name = "Zahratun Qorako`l"
-    pos_number = "1"
-    pos_ip = "192.168.1.100"
-    snapshot = @{
-        fiscal_status = "ERROR"
-        last_check = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
-        error_message = "ТЕСТОВАЯ ОШИБКА: Касса не отвечает"
-        receipt_count = 150
-        fiscal_unsent_count = 5
-        z_report_count = 10
+    shopInn = "311030320"
+    shopNumber = "1"
+    shopName = "Zahratun Qorako`l"
+    posNumber = "1"
+    posIp = "192.168.1.100"
+    alerts = @(
+        @{
+            severity = "CRITICAL"
+            message = "🧪 ТЕСТ: Касса не отвечает на запросы"
+            code = "TEST_ERROR"
+        }
+    )
+    fiscal = @{
+        fiscalStatus = "ERROR"
+        lastCheck = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+        errorMessage = "🧪 ТЕСТ: Касса не отвечает на запросы"
+        receiptCount = 150
+        fiscalUnsentCount = 5
+        zReportCount = 10
     }
 } | ConvertTo-Json -Depth 5
 
-# Отправить
+Write-Host "`n=== Отправка тестового snapshot ===" -ForegroundColor Yellow
+Write-Host $snapshot
+
+# Отправить (БЕЗ токена — endpoint публичный)
 $response = Invoke-WebRequest `
-    -Uri "https://fiscaldrive.sbg.network/api/v1/ingest" `
+    -Uri "https://fiscaldrive.sbg.network/api/v1/fiscal/snapshot" `
     -Method POST `
     -Headers @{
-        "X-Token" = $token
         "Content-Type" = "application/json"
     } `
     -Body $snapshot `
     -UseBasicParsing
 
+Write-Host "`n✅ Snapshot отправлен!" -ForegroundColor Green
 Write-Host "Статус: $($response.StatusCode)"
-Write-Host "Ответ: $($response.Content)"
 ```
 
 **Что произойдёт:**
