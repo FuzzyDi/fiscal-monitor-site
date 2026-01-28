@@ -33,7 +33,6 @@ class TelegramSender {
         const response = await axios.post(`${TELEGRAM_API_URL}/sendMessage`, {
           chat_id: chatId,
           text: text,
-          parse_mode: null,
           disable_web_page_preview: true
         });
 
