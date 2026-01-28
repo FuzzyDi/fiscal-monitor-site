@@ -48,7 +48,7 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_status
 CREATE TABLE IF NOT EXISTS notification_preferences (
   id SERIAL PRIMARY KEY,
   subscription_id INTEGER NOT NULL REFERENCES notification_subscriptions(id) ON DELETE CASCADE,
-  severity_filter VARCHAR(20) DEFAULT 'DANGER', -- 'INFO', 'WARN', 'DANGER', 'CRITICAL'
+  severity_filter TEXT[] DEFAULT ARRAY['DANGER', 'CRITICAL'],
   notify_on_recovery BOOLEAN DEFAULT true,
   notify_on_stale BOOLEAN DEFAULT true,
   notify_on_return BOOLEAN DEFAULT true,
@@ -59,20 +59,25 @@ CREATE TABLE IF NOT EXISTS notification_preferences (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_preferences_subscription 
   ON notification_preferences(subscription_id);
 
--- Telegram connections
+-- Telegram connections (multiple users per subscription allowed)
 CREATE TABLE IF NOT EXISTS telegram_connections (
   id SERIAL PRIMARY KEY,
   subscription_id INTEGER NOT NULL REFERENCES notification_subscriptions(id) ON DELETE CASCADE,
   telegram_chat_id BIGINT NOT NULL,
   telegram_chat_type VARCHAR(20), -- 'private', 'group', 'supergroup'
   telegram_chat_title TEXT,
+  telegram_username VARCHAR(255),
   is_active BOOLEAN DEFAULT true,
   connected_at TIMESTAMPTZ DEFAULT NOW(),
   last_notification_at TIMESTAMPTZ
 );
 
--- Only one active connection per subscription
-CREATE UNIQUE INDEX IF NOT EXISTS idx_telegram_connections_active 
+-- Each chat_id can only be connected once per subscription (but multiple chats allowed)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_telegram_connections_unique_chat 
+  ON telegram_connections(subscription_id, telegram_chat_id) 
+  WHERE is_active = true;
+
+CREATE INDEX IF NOT EXISTS idx_telegram_connections_sub 
   ON telegram_connections(subscription_id) 
   WHERE is_active = true;
 

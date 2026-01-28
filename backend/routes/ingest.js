@@ -60,6 +60,66 @@ function enrichFiscal(fiscal) {
 }
 
 /**
+ * Queue notifications for active Telegram subscriptions
+ * Checks cooldowns to avoid spam
+ */
+async function queueNotifications(shopInn, stateKey, severity, alerts, shopNumber, posNumber) {
+  const COOLDOWN_MINUTES = 30;
+  
+  // Find active subscriptions with matching severity filter
+  const subsResult = await pool.query(`
+    SELECT ns.id as subscription_id, np.severity_filter
+    FROM notification_subscriptions ns
+    JOIN notification_preferences np ON np.subscription_id = ns.id
+    JOIN telegram_connections tc ON tc.subscription_id = ns.id AND tc.is_active = true
+    WHERE ns.shop_inn = $1 
+      AND ns.status = 'active'
+      AND ns.expires_at > NOW()
+      AND $2 = ANY(np.severity_filter)
+  `, [shopInn, severity]);
+  
+  if (subsResult.rows.length === 0) {
+    return; // No active subscriptions for this INN/severity
+  }
+  
+  // Generate alert summary
+  const alertSummary = alerts.slice(0, 3).map(a => a.message || a.type).join('; ');
+  
+  for (const sub of subsResult.rows) {
+    // Check cooldown - don't spam the same terminal
+    const cooldownResult = await pool.query(`
+      SELECT id FROM notification_cooldowns
+      WHERE subscription_id = $1 
+        AND state_key = $2
+        AND last_notified_at > NOW() - INTERVAL '${COOLDOWN_MINUTES} minutes'
+        AND last_severity = $3
+    `, [sub.subscription_id, stateKey, severity]);
+    
+    if (cooldownResult.rows.length > 0) {
+      logger.debug(`Cooldown active for subscription ${sub.subscription_id}, state ${stateKey}`);
+      continue;
+    }
+    
+    // Add to notification queue
+    await pool.query(`
+      INSERT INTO notification_queue 
+        (subscription_id, state_key, severity, event_type, alert_summary, shop_number, pos_number)
+      VALUES ($1, $2, $3, 'new_alert', $4, $5, $6)
+    `, [sub.subscription_id, stateKey, severity, alertSummary, shopNumber, posNumber]);
+    
+    // Update cooldown
+    await pool.query(`
+      INSERT INTO notification_cooldowns (subscription_id, state_key, last_notified_at, last_severity)
+      VALUES ($1, $2, NOW(), $3)
+      ON CONFLICT (subscription_id, state_key) 
+      DO UPDATE SET last_notified_at = NOW(), last_severity = EXCLUDED.last_severity
+    `, [sub.subscription_id, stateKey, severity]);
+    
+    logger.debug(`Queued notification for subscription ${sub.subscription_id}`);
+  }
+}
+
+/**
  * POST /api/v1/fiscal/snapshot
  * Accept POS snapshots without authentication
  * Always returns 204 to never block POS
@@ -195,6 +255,12 @@ router.post('/snapshot', async (req, res) => {
     }
     
     logger.info(`Snapshot ingested: ${stateKey} (severity: ${severity || 'none'}, alerts: ${alerts.length})`);
+    
+    // Queue notifications for Telegram (async, don't block response)
+    if (isRegistered && severity && severity !== 'INFO' && alerts.length > 0) {
+      queueNotifications(shopInnNorm, stateKey, severity, alerts, shopNumberNorm, posNumberNorm)
+        .catch(err => logger.warn('Failed to queue notifications:', err.message));
+    }
     
     // Always return 204
     res.status(204).send();

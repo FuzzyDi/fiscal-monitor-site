@@ -87,19 +87,17 @@ async function processNotificationQueue() {
         continue;
       }
 
-      // Получить активное подключение
+      // Получить ВСЕ активные подключения для этой подписки
       const connResult = await db.query(`
-        SELECT id, telegram_chat_id, last_notification_at
+        SELECT id, telegram_chat_id, telegram_username, last_notification_at
         FROM telegram_connections
         WHERE subscription_id = $1 AND is_active = true
       `, [subscription_id]);
 
       if (connResult.rows.length === 0) {
-        logger.warn(`No active connection for subscription ${subscription_id}, skipping`);
+        logger.warn(`No active connections for subscription ${subscription_id}, skipping`);
         continue;
       }
-
-      const connection = connResult.rows[0];
 
       // Определить приоритет
       const hasCritical = alerts.some(a => a.severity === 'CRITICAL');
@@ -107,10 +105,14 @@ async function processNotificationQueue() {
       // Решение об отправке:
       // 1. Если есть CRITICAL - отправляем немедленно
       // 2. Если накопилось >= 3 алертов - отправляем
-      // 3. Если прошло >= 5 минут с последнего уведомления - отправляем
-      const lastSent = connection.last_notification_at;
-      const minutesSinceLastSent = lastSent
-        ? (Date.now() - new Date(lastSent).getTime()) / 60000
+      // 3. Если прошло >= 5 минут с любого последнего уведомления - отправляем
+      const oldestLastSent = connResult.rows
+        .map(c => c.last_notification_at)
+        .filter(Boolean)
+        .sort()[0];
+      
+      const minutesSinceLastSent = oldestLastSent
+        ? (Date.now() - new Date(oldestLastSent).getTime()) / 60000
         : Infinity;
 
       const shouldSend = hasCritical || alerts_count >= 3 || minutesSinceLastSent >= 5;
@@ -123,31 +125,40 @@ async function processNotificationQueue() {
       // Формировать сообщение
       const message = formatMessage(alerts);
 
-      // Отправить через Telegram
-      const result = await sender.send(connection.telegram_chat_id, message);
+      // Отправить ВСЕМ подключённым пользователям
+      let sentCount = 0;
+      for (const connection of connResult.rows) {
+        const result = await sender.send(connection.telegram_chat_id, message);
 
-      if (result.success) {
-        // Пометить как обработанные
+        if (result.success) {
+          sentCount++;
+          
+          // Обновить время последней отправки для этого подключения
+          await db.query(`
+            UPDATE telegram_connections
+            SET last_notification_at = NOW()
+            WHERE id = $1
+          `, [connection.id]);
+
+          // Логировать в историю
+          await db.query(`
+            INSERT INTO notification_history
+              (connection_id, subscription_id, message_text, alerts_count, telegram_message_id, delivered)
+            VALUES ($1, $2, $3, $4, $5, true)
+          `, [connection.id, subscription_id, message, alerts_count, result.message_id]);
+        } else {
+          logger.warn(`Failed to send to chat ${connection.telegram_chat_id}: ${result.error}`);
+        }
+      }
+
+      if (sentCount > 0) {
+        // Пометить как обработанные только если хотя бы одно сообщение отправлено
         await db.query(`
           DELETE FROM notification_queue
           WHERE subscription_id = $1 AND processed = false
         `, [subscription_id]);
 
-        // Обновить время последней отправки
-        await db.query(`
-          UPDATE telegram_connections
-          SET last_notification_at = NOW()
-          WHERE id = $1
-        `, [connection.id]);
-
-        // Логировать в историю
-        await db.query(`
-          INSERT INTO notification_history
-            (connection_id, subscription_id, message_text, alerts_count, telegram_message_id, delivered)
-          VALUES ($1, $2, $3, $4, $5, true)
-        `, [connection.id, subscription_id, message, alerts_count, result.message_id]);
-
-        logger.info(`Notification sent: subscription=${subscription_id}, alerts=${alerts_count}`);
+        logger.info(`Notification sent: subscription=${subscription_id}, alerts=${alerts_count}, recipients=${sentCount}/${connResult.rows.length}`);
       } else {
         // Логировать ошибку
         await db.query(`

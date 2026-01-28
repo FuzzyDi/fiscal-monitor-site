@@ -109,9 +109,10 @@ export const adminApi = {
       headers: { 'X-Admin-Key': key }
     }),
 
-  exportTelegramSubscriptions: (key) =>
-    axios.get(`${API_URL}/api/v1/admin/telegram/export/subscriptions`, {
+  exportTelegramSubscriptions: (key, type = 'subscriptions') =>
+    axios.get(`${API_URL}/api/v1/admin/telegram/export`, {
       headers: { 'X-Admin-Key': key },
+      params: { type },
       responseType: 'blob'
     }),
 
@@ -139,6 +140,39 @@ export const portalApi = {
   getSummary: (token) =>
     axios.get(`${API_URL}/api/v1/portal/summary`, {
       headers: { 'X-Token': token }
+    }),
+
+  // Telegram methods
+  getTelegramStatus: (token) =>
+    axios.get(`${API_URL}/api/v1/portal/telegram/status`, {
+      headers: { 'X-Token': token }
+    }),
+
+  requestTelegramSubscription: (token, comment) =>
+    axios.post(`${API_URL}/api/v1/portal/telegram/request-subscription`, 
+      { comment }, 
+      { headers: { 'X-Token': token, 'Content-Type': 'application/json' } }
+    ),
+
+  cancelTelegramRequest: (token) =>
+    axios.delete(`${API_URL}/api/v1/portal/telegram/cancel-request`, {
+      headers: { 'X-Token': token }
+    }),
+
+  generateTelegramCode: (token) =>
+    axios.post(`${API_URL}/api/v1/portal/telegram/generate-code`, {}, {
+      headers: { 'X-Token': token }
+    }),
+
+  disconnectTelegram: (token, connectionId = null) =>
+    axios.post(`${API_URL}/api/v1/portal/telegram/disconnect`, 
+      connectionId ? { connection_id: connectionId } : {},
+      { headers: { 'X-Token': token, 'Content-Type': 'application/json' } }
+    ),
+
+  updateTelegramPreferences: (token, preferences) =>
+    axios.put(`${API_URL}/api/v1/portal/telegram/preferences`, preferences, {
+      headers: { 'X-Token': token, 'Content-Type': 'application/json' }
     })
 };
 

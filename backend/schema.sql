@@ -135,6 +135,7 @@ CREATE TABLE IF NOT EXISTS notification_subscriptions (
 
 CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON notification_subscriptions(shop_inn, status);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_expires ON notification_subscriptions(expires_at) WHERE status = 'active';
+CREATE INDEX IF NOT EXISTS idx_subscriptions_active_inn ON notification_subscriptions(shop_inn) WHERE status = 'active';
 
 -- Notification preferences (client settings)
 CREATE TABLE IF NOT EXISTS notification_preferences (
@@ -157,15 +158,18 @@ CREATE TABLE IF NOT EXISTS telegram_connections (
   telegram_chat_id BIGINT NOT NULL,
   telegram_chat_type VARCHAR(20), -- 'private', 'group', 'supergroup'
   telegram_chat_title TEXT,
+  telegram_username VARCHAR(255),
   is_active BOOLEAN DEFAULT true,
   connected_at TIMESTAMPTZ DEFAULT NOW(),
-  last_notification_at TIMESTAMPTZ,
-  
-  -- Only one active connection per subscription
-  CONSTRAINT unique_active_connection UNIQUE (subscription_id, is_active) WHERE is_active = true
+  last_notification_at TIMESTAMPTZ
 );
 
-CREATE INDEX IF NOT EXISTS idx_telegram_connections_active ON telegram_connections(subscription_id, is_active);
+-- Each chat_id can only be connected once per subscription (but multiple chats allowed per subscription)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_telegram_connections_unique_chat 
+  ON telegram_connections(subscription_id, telegram_chat_id) 
+  WHERE is_active = true;
+
+CREATE INDEX IF NOT EXISTS idx_telegram_connections_active ON telegram_connections(subscription_id) WHERE is_active = true;
 CREATE INDEX IF NOT EXISTS idx_telegram_connections_chat_id ON telegram_connections(telegram_chat_id);
 
 -- Telegram connect codes (one-time use, 10 min TTL)

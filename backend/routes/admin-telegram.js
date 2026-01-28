@@ -55,8 +55,10 @@ router.post('/approve-request/:requestId', async (req, res) => {
     const { duration_months, admin_comment } = req.body;
     const adminKey = req.get('X-Admin-Key');
 
-    if (!duration_months || duration_months <= 0) {
-      return res.status(400).json({ error: 'Invalid duration_months' });
+    // Строгая валидация duration_months
+    const months = Number(duration_months);
+    if (!Number.isInteger(months) || months <= 0 || months > 36) {
+      return res.status(400).json({ error: 'duration_months must be integer 1-36' });
     }
 
     await client.query('BEGIN');
@@ -92,7 +94,7 @@ router.post('/approve-request/:requestId', async (req, res) => {
 
     // Создать подписку
     const expiresAt = new Date();
-    expiresAt.setMonth(expiresAt.getMonth() + parseFloat(duration_months));
+    expiresAt.setMonth(expiresAt.getMonth() + months);
 
     const subResult = await client.query(`
       INSERT INTO notification_subscriptions 
@@ -225,8 +227,10 @@ router.post('/extend-subscription/:subscriptionId', async (req, res) => {
     const { subscriptionId } = req.params;
     const { duration_months, payment_note } = req.body;
 
-    if (!duration_months || duration_months <= 0) {
-      return res.status(400).json({ error: 'Invalid duration_months' });
+    // Строгая валидация duration_months
+    const months = Number(duration_months);
+    if (!Number.isInteger(months) || months <= 0 || months > 36) {
+      return res.status(400).json({ error: 'duration_months must be integer 1-36' });
     }
 
     // Получить текущую подписку
@@ -245,7 +249,7 @@ router.post('/extend-subscription/:subscriptionId', async (req, res) => {
     // Продлить от текущей даты истечения или от сейчас (если уже истекла)
     const baseDate = currentExpiry > now ? currentExpiry : now;
     const newExpiry = new Date(baseDate);
-    newExpiry.setMonth(newExpiry.getMonth() + parseFloat(duration_months));
+    newExpiry.setMonth(newExpiry.getMonth() + months);
 
     // Обновить подписку
     const result = await db.query(`

@@ -31,6 +31,19 @@ function checkRateLimit(chatId) {
   return true;
 }
 
+// Периодическая очистка старых записей rate limiter (предотвращение memory leak)
+setInterval(() => {
+  const now = Date.now();
+  for (const [chatId, attempts] of connectAttempts) {
+    const recent = attempts.filter(t => now - t < 10 * 60 * 1000);
+    if (recent.length === 0) {
+      connectAttempts.delete(chatId);
+    } else {
+      connectAttempts.set(chatId, recent);
+    }
+  }
+}, 60 * 1000); // Каждую минуту
+
 // /start
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
@@ -57,6 +70,7 @@ bot.onText(/\/connect\s+(\d{6})/, async (msg, match) => {
   const chatId = msg.chat.id;
   const chatType = msg.chat.type; // 'private', 'group', 'supergroup'
   const chatTitle = msg.chat.title || null;
+  const username = msg.from?.username || null;
   const code = match[1].trim();
   
   // Rate limiting
@@ -96,52 +110,49 @@ bot.onText(/\/connect\s+(\d{6})/, async (msg, match) => {
       return;
     }
     
-    // 4. Проверить не занят ли этот chat_id другим клиентом
+    // 4. Проверить не подключен ли уже этот chat_id к этой же подписке
     const existingConnection = await db.query(`
       SELECT tc.id, ns.shop_inn, r.title
       FROM telegram_connections tc
       JOIN notification_subscriptions ns ON ns.id = tc.subscription_id
       JOIN registrations r ON r.shop_inn = ns.shop_inn
-      WHERE tc.telegram_chat_id = $1 AND tc.is_active = true
-    `, [chatId]);
+      WHERE tc.telegram_chat_id = $1 
+        AND tc.subscription_id = $2
+        AND tc.is_active = true
+    `, [chatId, codeData.subscription_id]);
     
     if (existingConnection.rows.length > 0) {
       const existing = existingConnection.rows[0];
       bot.sendMessage(chatId, 
         `Этот чат уже подключен к аккаунту: ${existing.title} (ИНН: ${existing.shop_inn}).\n\n` +
-        `Сначала отключите уведомления (команда /disconnect) или используйте другой чат.`
+        `Используйте команду /disconnect для отключения или подключите другой чат.`
       );
       return;
     }
     
-    // 5. Деактивировать старые подключения для этой подписки
-    await db.query(`
-      UPDATE telegram_connections
-      SET is_active = false
-      WHERE subscription_id = $1
-    `, [codeData.subscription_id]);
-    
-    // 6. Создать новое подключение
+    // 5. Создать новое подключение (НЕ деактивируя старые - разрешаем несколько)
     await db.query(`
       INSERT INTO telegram_connections
-        (subscription_id, telegram_chat_id, telegram_chat_type, telegram_chat_title, is_active)
-      VALUES ($1, $2, $3, $4, true)
-    `, [codeData.subscription_id, chatId, chatType, chatTitle]);
+        (subscription_id, telegram_chat_id, telegram_chat_type, telegram_chat_title, telegram_username, is_active)
+      VALUES ($1, $2, $3, $4, $5, true)
+    `, [codeData.subscription_id, chatId, chatType, chatTitle, username]);
     
-    // 7. Пометить код как использованный
+    // 6. Пометить код как использованный
     await db.query(`
       UPDATE telegram_connect_codes
       SET used = true, used_at = NOW(), telegram_chat_id = $1
       WHERE code = $2
     `, [chatId, code]);
     
-    logger.info(`Telegram connected: subscription_id=${codeData.subscription_id}, chat_id=${chatId}, type=${chatType}`);
+    logger.info(`Telegram connected: subscription_id=${codeData.subscription_id}, chat_id=${chatId}, type=${chatType}, user=${username}`);
     
     const successMessage = `
-Уведомления подключены!
+✅ Уведомления подключены!
 
 Вы будете получать алерты о проблемах с терминалами.
 Настроить уведомления можно в портале.
+
+💡 К одному аккаунту можно подключить несколько Telegram (себя, бухгалтера, директора и т.д.)
 
 Доступные команды:
 /status - текущее состояние

@@ -16,6 +16,15 @@ USING CASE
   ELSE ARRAY['DANGER', 'CRITICAL']::TEXT[]
 END;
 
+-- Установить default
+ALTER TABLE notification_preferences
+ALTER COLUMN severity_filter SET DEFAULT ARRAY['DANGER', 'CRITICAL'];
+
+-- Добавить индекс для активных подписок
+CREATE INDEX IF NOT EXISTS idx_subscriptions_active_inn 
+  ON notification_subscriptions(shop_inn) 
+  WHERE status = 'active';
+
 COMMIT;
 
 -- Проверка

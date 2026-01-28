@@ -23,7 +23,7 @@ router.get('/status', async (req, res) => {
         np.notify_on_return
       FROM notification_subscriptions ns
       LEFT JOIN notification_preferences np ON np.subscription_id = ns.id
-      WHERE ns.shop_inn = $1 AND ns.status = 'active'
+      WHERE ns.shop_inn = $1 AND ns.status = 'active' AND ns.expires_at > NOW()
     `, [shopInn]);
 
     if (subResult.rows.length === 0) {
@@ -44,17 +44,19 @@ router.get('/status', async (req, res) => {
 
     const subscription = subResult.rows[0];
 
-    // Получить активное подключение
+    // Получить все активные подключения (может быть несколько)
     const connResult = await db.query(`
       SELECT 
         id,
         telegram_chat_id,
         telegram_chat_type,
         telegram_chat_title,
+        telegram_username,
         connected_at,
         last_notification_at
       FROM telegram_connections
       WHERE subscription_id = $1 AND is_active = true
+      ORDER BY connected_at ASC
     `, [subscription.id]);
 
     // Получить активный код (если есть)
@@ -75,7 +77,9 @@ router.get('/status', async (req, res) => {
         started_at: subscription.started_at,
         expires_at: subscription.expires_at
       },
+      // Для обратной совместимости оставляем connection (первое), добавляем connections (все)
       connection: connResult.rows[0] || null,
+      connections: connResult.rows,
       preferences: subscription.severity_filter ? {
         severity_filter: subscription.severity_filter,
         notify_on_recovery: subscription.notify_on_recovery !== null ? subscription.notify_on_recovery : true,
@@ -190,16 +194,6 @@ router.post('/generate-code', async (req, res) => {
 
     const subscriptionId = subResult.rows[0].id;
 
-    // Проверить есть ли уже активное подключение
-    const connResult = await db.query(`
-      SELECT id FROM telegram_connections
-      WHERE subscription_id = $1 AND is_active = true
-    `, [subscriptionId]);
-
-    if (connResult.rows.length > 0) {
-      return res.status(400).json({ error: 'Telegram уже подключен. Сначала отключите.' });
-    }
-
     // Проверить есть ли активный неиспользованный код
     const existingCode = await db.query(`
       SELECT code, expires_at FROM telegram_connect_codes
@@ -222,42 +216,54 @@ router.post('/generate-code', async (req, res) => {
       });
     }
 
-    // Генерировать новый код
+    // Генерировать новый код с атомарной проверкой уникальности
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     let code;
+    let inserted = false;
     let attempts = 0;
-    while (attempts < 10) {
+    
+    while (!inserted && attempts < 10) {
       code = generateCode();
-      
-      // Проверить уникальность
-      const check = await db.query(`
-        SELECT id FROM telegram_connect_codes WHERE code = $1
-      `, [code]);
-      
-      if (check.rows.length === 0) break;
       attempts++;
+      
+      try {
+        // Атомарная вставка - если код уже существует, constraint сработает
+        await db.query(`
+          INSERT INTO telegram_connect_codes 
+            (subscription_id, code, expires_at)
+          VALUES ($1, $2, $3)
+        `, [subscriptionId, code, expiresAt]);
+        inserted = true;
+      } catch (err) {
+        // Unique violation - попробуем другой код
+        if (err.code === '23505') {
+          continue;
+        }
+        throw err;
+      }
     }
 
-    if (attempts >= 10) {
+    if (!inserted) {
       return res.status(500).json({ error: 'Не удалось сгенерировать уникальный код' });
     }
 
-    // Сохранить код (TTL = 10 минут)
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    // Получить количество текущих подключений
+    const connCount = await db.query(`
+      SELECT COUNT(*) as cnt FROM telegram_connections
+      WHERE subscription_id = $1 AND is_active = true
+    `, [subscriptionId]);
     
-    await db.query(`
-      INSERT INTO telegram_connect_codes 
-        (subscription_id, code, expires_at)
-      VALUES ($1, $2, $3)
-    `, [subscriptionId, code, expiresAt]);
+    const currentConnections = parseInt(connCount.rows[0].cnt) || 0;
 
-    logger.info(`Telegram connect code generated: ${shopInn}`);
+    logger.info(`Telegram connect code generated: ${shopInn}, current connections: ${currentConnections}`);
 
     res.json({
       code,
       expires_in_seconds: 600,
       expires_at: expiresAt,
       bot_username: process.env.TELEGRAM_BOT_USERNAME || 'FiscalMonitorBot',
-      instructions: `Напишите боту: /connect ${code}`
+      instructions: `Напишите боту: /connect ${code}`,
+      current_connections: currentConnections
     });
 
   } catch (error) {
@@ -267,9 +273,11 @@ router.post('/generate-code', async (req, res) => {
 });
 
 // POST /api/v1/portal/telegram/disconnect - Отключить Telegram
+// Body: { connection_id?: number } - если указан, отключает конкретное подключение
 router.post('/disconnect', async (req, res) => {
   try {
     const shopInn = req.shopInn;
+    const { connection_id } = req.body;
 
     // Получить подписку
     const subResult = await db.query(`
@@ -283,23 +291,38 @@ router.post('/disconnect', async (req, res) => {
 
     const subscriptionId = subResult.rows[0].id;
 
-    // Деактивировать подключение
-    const result = await db.query(`
-      UPDATE telegram_connections
-      SET is_active = false
-      WHERE subscription_id = $1 AND is_active = true
-      RETURNING id
-    `, [subscriptionId]);
+    let result;
+    if (connection_id) {
+      // Отключить конкретное подключение
+      result = await db.query(`
+        UPDATE telegram_connections
+        SET is_active = false
+        WHERE id = $1 AND subscription_id = $2 AND is_active = true
+        RETURNING id, telegram_chat_title, telegram_username
+      `, [connection_id, subscriptionId]);
+    } else {
+      // Отключить все подключения (backward compatibility)
+      result = await db.query(`
+        UPDATE telegram_connections
+        SET is_active = false
+        WHERE subscription_id = $1 AND is_active = true
+        RETURNING id
+      `, [subscriptionId]);
+    }
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Активное подключение не найдено' });
     }
 
-    logger.info(`Telegram disconnected: ${shopInn}`);
+    const disconnectedCount = result.rows.length;
+    logger.info(`Telegram disconnected: ${shopInn}, count: ${disconnectedCount}`);
 
     res.json({
       success: true,
-      message: 'Telegram отключен'
+      message: connection_id 
+        ? `Telegram ${result.rows[0].telegram_username || result.rows[0].telegram_chat_title || ''} отключен`
+        : `Отключено подключений: ${disconnectedCount}`,
+      disconnected_count: disconnectedCount
     });
 
   } catch (error) {
