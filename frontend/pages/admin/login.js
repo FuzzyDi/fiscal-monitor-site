@@ -16,19 +16,14 @@ export default function AdminLogin() {
     setLoading(true);
 
     try {
-      // Test the API key
       await adminApi.getOverview(apiKey);
-      
-      // Store in localStorage
       localStorage.setItem('adminKey', apiKey);
-      
-      // Redirect to dashboard
       router.push('/admin/dashboard');
     } catch (err) {
       if (err.response?.status === 401) {
-        setError('Invalid admin key');
+        setError('Неверный ключ администратора');
       } else {
-        setError('Failed to connect to server');
+        setError('Ошибка подключения к серверу');
       }
     } finally {
       setLoading(false);
@@ -38,13 +33,13 @@ export default function AdminLogin() {
   return (
     <>
       <Head>
-        <title>Admin Login - Fiscal Monitor</title>
+        <title>Вход в панель администратора - Fiscal Monitor</title>
       </Head>
 
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
         <div className="max-w-md w-full mx-4">
           <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-100">
-            {/* Header with Icon */}
+            {/* Header */}
             <div className="text-center mb-8">
               <div className="inline-flex w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl items-center justify-center mb-4 shadow-lg">
                 <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -52,17 +47,17 @@ export default function AdminLogin() {
                 </svg>
               </div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Admin Panel
+                Панель администратора
               </h1>
               <p className="text-gray-600">
-                Enter your admin API key to continue
+                Введите ключ администратора для входа
               </p>
             </div>
 
             <form onSubmit={handleSubmit}>
               <div className="mb-6">
                 <label htmlFor="apiKey" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Admin API Key
+                  Ключ администратора
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -76,7 +71,7 @@ export default function AdminLogin() {
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
-                    placeholder="Enter admin key"
+                    placeholder="Введите ключ"
                     required
                   />
                 </div>
@@ -104,10 +99,10 @@ export default function AdminLogin() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    Logging in...
+                    Вход...
                   </span>
                 ) : (
-                  'Login to Dashboard'
+                  'Войти'
                 )}
               </button>
             </form>
@@ -117,7 +112,7 @@ export default function AdminLogin() {
                 <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
-                Back to home
+                На главную
               </Link>
             </div>
           </div>

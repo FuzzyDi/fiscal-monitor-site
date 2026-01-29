@@ -172,31 +172,35 @@ export default function TelegramSubscriptions() {
 }
 
 function StatisticsPanel({ statistics }) {
+  if (!statistics || !statistics.subscriptions) {
+    return <div className="text-center py-8 text-gray-500">Нет данных</div>;
+  }
+
   return (
     <div className="space-y-6">
       {/* Основные метрики */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white shadow rounded-lg p-4">
           <h3 className="text-sm text-gray-500 mb-1">Активных подписок</h3>
-          <p className="text-3xl font-bold text-green-600">{statistics.subscriptions.active}</p>
+          <p className="text-3xl font-bold text-green-600">{statistics.subscriptions?.active || 0}</p>
           <p className="text-xs text-gray-400 mt-1">
-            истекает скоро: {statistics.subscriptions.expiring_soon}
+            истекает скоро: {statistics.subscriptions?.expiring_soon || 0}
           </p>
         </div>
         <div className="bg-white shadow rounded-lg p-4">
           <h3 className="text-sm text-gray-500 mb-1">Telegram подключений</h3>
-          <p className="text-3xl font-bold text-blue-600">{statistics.connections.active}</p>
+          <p className="text-3xl font-bold text-blue-600">{statistics.connections?.active || 0}</p>
           <p className="text-xs text-gray-400 mt-1">
-            личных: {statistics.connections.private_chats}, групп: {statistics.connections.group_chats}
+            личных: {statistics.connections?.private_chats || 0}, групп: {statistics.connections?.group_chats || 0}
           </p>
         </div>
         <div className="bg-white shadow rounded-lg p-4">
           <h3 className="text-sm text-gray-500 mb-1">Ожидают одобрения</h3>
-          <p className="text-3xl font-bold text-yellow-600">{statistics.requests.pending}</p>
+          <p className="text-3xl font-bold text-yellow-600">{statistics.requests?.pending || 0}</p>
         </div>
         <div className="bg-white shadow rounded-lg p-4">
           <h3 className="text-sm text-gray-500 mb-1">В очереди отправки</h3>
-          <p className="text-3xl font-bold text-purple-600">{statistics.queue.pending}</p>
+          <p className="text-3xl font-bold text-purple-600">{statistics.queue?.pending || 0}</p>
         </div>
       </div>
 
@@ -205,26 +209,26 @@ function StatisticsPanel({ statistics }) {
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Уведомления за 30 дней</h3>
         <div className="grid grid-cols-4 gap-4 text-center">
           <div>
-            <p className="text-2xl font-bold text-gray-900">{statistics.notifications_30d.total}</p>
+            <p className="text-2xl font-bold text-gray-900">{statistics.notifications_30d?.total || 0}</p>
             <p className="text-sm text-gray-500">всего</p>
           </div>
           <div>
-            <p className="text-2xl font-bold text-green-600">{statistics.notifications_30d.delivered}</p>
+            <p className="text-2xl font-bold text-green-600">{statistics.notifications_30d?.delivered || 0}</p>
             <p className="text-sm text-gray-500">доставлено</p>
           </div>
           <div>
-            <p className="text-2xl font-bold text-red-600">{statistics.notifications_30d.failed}</p>
+            <p className="text-2xl font-bold text-red-600">{statistics.notifications_30d?.failed || 0}</p>
             <p className="text-sm text-gray-500">ошибок</p>
           </div>
           <div>
-            <p className="text-2xl font-bold text-orange-600">{statistics.notifications_30d.total_alerts}</p>
+            <p className="text-2xl font-bold text-orange-600">{statistics.notifications_30d?.total_alerts || 0}</p>
             <p className="text-sm text-gray-500">алертов</p>
           </div>
         </div>
       </div>
 
       {/* По дням */}
-      {statistics.daily_stats.length > 0 && (
+      {statistics.daily_stats && statistics.daily_stats.length > 0 && (
         <div className="bg-white shadow rounded-lg p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">По дням (последние 14)</h3>
           <div className="overflow-x-auto">
@@ -251,7 +255,7 @@ function StatisticsPanel({ statistics }) {
       )}
 
       {/* Топ проблемных */}
-      {statistics.top_problematic.length > 0 && (
+      {statistics.top_problematic && statistics.top_problematic.length > 0 && (
         <div className="bg-white shadow rounded-lg p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Топ-10 проблемных ИНН (30 дней)</h3>
           <table className="min-w-full text-sm">
