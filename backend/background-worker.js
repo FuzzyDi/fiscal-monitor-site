@@ -175,47 +175,71 @@ async function processNotificationQueue() {
   }
 }
 
-// Проверка истечения подписок
+// Проверка истечения подписок (улучшенная версия)
 async function checkExpiringSubscriptions() {
   logger.info('Checking expiring subscriptions...');
 
-  // Предупреждения за 3 дня
-  const expiringSoonResult = await db.query(`
-    SELECT ns.id, ns.shop_inn, ns.expires_at, tc.telegram_chat_id
-    FROM notification_subscriptions ns
-    JOIN telegram_connections tc ON tc.subscription_id = ns.id
-    WHERE ns.status = 'active'
-      AND tc.is_active = true
-      AND ns.expires_at BETWEEN NOW() AND NOW() + INTERVAL '3 days'
-      AND ns.expires_at > NOW() + INTERVAL '2 days'
-  `);
+  const portalUrl = process.env.PORTAL_URL || 'https://fiscaldrive.sbg.network';
 
-  for (const row of expiringSoonResult.rows) {
-    const daysLeft = Math.ceil(
-      (new Date(row.expires_at) - new Date()) / (1000 * 60 * 60 * 24)
-    );
+  // Напоминания за 7, 3 и 1 день
+  const reminderDays = [7, 3, 1];
+  
+  for (const days of reminderDays) {
+    const result = await db.query(`
+      SELECT 
+        ns.id, 
+        ns.shop_inn, 
+        ns.expires_at,
+        r.title,
+        ARRAY_AGG(tc.telegram_chat_id) as chat_ids
+      FROM notification_subscriptions ns
+      JOIN telegram_connections tc ON tc.subscription_id = ns.id AND tc.is_active = true
+      LEFT JOIN registrations r ON r.shop_inn = ns.shop_inn
+      WHERE ns.status = 'active'
+        AND ns.expires_at::date = (CURRENT_DATE + INTERVAL '${days} days')::date
+      GROUP BY ns.id, ns.shop_inn, ns.expires_at, r.title
+    `);
 
-    const message = `
-ВНИМАНИЕ: Подписка истекает
+    for (const row of result.rows) {
+      const expiryDate = new Date(row.expires_at).toLocaleDateString('ru-RU');
+      const orgName = row.title || `ИНН ${row.shop_inn}`;
+      
+      let urgency = '';
+      if (days === 1) urgency = '⚠️ СРОЧНО: ';
+      else if (days === 3) urgency = '⚠️ ';
 
-Ваша подписка истекает через ${daysLeft} дн.
+      const message = `
+${urgency}Подписка истекает через ${days} дн.
+
+Организация: ${orgName}
+Дата окончания: ${expiryDate}
+
 Для продления обратитесь к администратору.
+Портал: ${portalUrl}/portal
+      `.trim();
 
-Дата окончания: ${new Date(row.expires_at).toLocaleDateString('ru-RU')}
-    `.trim();
-
-    await sender.send(row.telegram_chat_id, message);
-    logger.info(`Expiry warning sent: subscription=${row.id}, days_left=${daysLeft}`);
+      // Отправить всем подключённым
+      for (const chatId of row.chat_ids) {
+        await sender.send(chatId, message);
+      }
+      
+      logger.info(`Expiry reminder (${days}d): ${row.shop_inn}, sent to ${row.chat_ids.length} chats`);
+    }
   }
 
-  // Истекшие подписки
+  // Обработка истекших подписок
   const expiredResult = await db.query(`
-    SELECT ns.id, ns.shop_inn, tc.telegram_chat_id
+    SELECT 
+      ns.id, 
+      ns.shop_inn,
+      r.title,
+      ARRAY_AGG(tc.telegram_chat_id) as chat_ids
     FROM notification_subscriptions ns
-    JOIN telegram_connections tc ON tc.subscription_id = ns.id
+    JOIN telegram_connections tc ON tc.subscription_id = ns.id AND tc.is_active = true
+    LEFT JOIN registrations r ON r.shop_inn = ns.shop_inn
     WHERE ns.status = 'active'
-      AND tc.is_active = true
       AND ns.expires_at < NOW()
+    GROUP BY ns.id, ns.shop_inn, r.title
   `);
 
   for (const row of expiredResult.rows) {
@@ -226,19 +250,117 @@ async function checkExpiringSubscriptions() {
       WHERE id = $1
     `, [row.id]);
 
-    // Уведомить
-    const message = `
-ПОДПИСКА ИСТЕКЛА
+    const orgName = row.title || `ИНН ${row.shop_inn}`;
 
-Ваша подписка на уведомления истекла.
+    const message = `
+❌ ПОДПИСКА ИСТЕКЛА
+
+Организация: ${orgName}
+Уведомления приостановлены.
+
 Для продления обратитесь к администратору.
     `.trim();
 
-    await sender.send(row.telegram_chat_id, message);
-    logger.info(`Subscription expired: subscription=${row.id}`);
+    // Отправить всем подключённым
+    for (const chatId of row.chat_ids) {
+      await sender.send(chatId, message);
+    }
+    
+    logger.info(`Subscription expired: ${row.shop_inn}`);
   }
 
-  logger.info(`Checked subscriptions: warned=${expiringSoonResult.rows.length}, expired=${expiredResult.rows.length}`);
+  logger.info('Expiring subscriptions check completed');
+}
+
+// Ежедневный отчёт (в 18:00)
+cron.schedule('0 18 * * *', async () => {
+  try {
+    await sendDailyReports();
+  } catch (error) {
+    logger.error('Error sending daily reports:', error);
+  }
+});
+
+async function sendDailyReports() {
+  logger.info('Sending daily reports...');
+
+  const portalUrl = process.env.PORTAL_URL || 'https://fiscaldrive.sbg.network';
+
+  // Получить статистику за сегодня для каждой активной подписки
+  const subsResult = await db.query(`
+    SELECT 
+      ns.id,
+      ns.shop_inn,
+      r.title,
+      ns.expires_at,
+      ARRAY_AGG(DISTINCT tc.telegram_chat_id) as chat_ids
+    FROM notification_subscriptions ns
+    JOIN telegram_connections tc ON tc.subscription_id = ns.id AND tc.is_active = true
+    LEFT JOIN registrations r ON r.shop_inn = ns.shop_inn
+    WHERE ns.status = 'active' AND ns.expires_at > NOW()
+    GROUP BY ns.id, ns.shop_inn, r.title, ns.expires_at
+  `);
+
+  for (const sub of subsResult.rows) {
+    // Статистика за сегодня
+    const todayStats = await db.query(`
+      SELECT 
+        COUNT(*) as notifications,
+        COALESCE(SUM(alerts_count), 0) as total_alerts
+      FROM notification_history
+      WHERE subscription_id = $1
+        AND sent_at::date = CURRENT_DATE
+    `, [sub.id]);
+
+    // Текущие проблемы
+    const currentProblems = await db.query(`
+      SELECT COUNT(*) as count
+      FROM fiscal_last_state
+      WHERE shop_inn = $1
+        AND severity IN ('DANGER', 'CRITICAL')
+        AND is_registered = true
+    `, [sub.shop_inn]);
+
+    const notifications = parseInt(todayStats.rows[0].notifications) || 0;
+    const alerts = parseInt(todayStats.rows[0].total_alerts) || 0;
+    const problems = parseInt(currentProblems.rows[0].count) || 0;
+    
+    const orgName = sub.title || `ИНН ${sub.shop_inn}`;
+    const daysLeft = Math.ceil((new Date(sub.expires_at) - new Date()) / (1000 * 60 * 60 * 24));
+
+    let statusLine = '';
+    if (problems === 0) {
+      statusLine = '✅ Все терминалы работают нормально';
+    } else {
+      statusLine = `⚠️ Требуют внимания: ${problems} терминалов`;
+    }
+
+    const message = `
+📊 ДНЕВНОЙ ОТЧЁТ
+
+${orgName}
+${new Date().toLocaleDateString('ru-RU')}
+
+${statusLine}
+
+За сегодня:
+• Уведомлений: ${notifications}
+• Алертов: ${alerts}
+
+Подписка активна ещё ${daysLeft} дн.
+
+Подробнее: ${portalUrl}/portal
+    `.trim();
+
+    // Отправить всем подключённым
+    for (const chatId of sub.chat_ids) {
+      await sender.send(chatId, message);
+    }
+    
+    logger.debug(`Daily report sent: ${sub.shop_inn}`);
+  }
+
+  logger.info(`Daily reports sent to ${subsResult.rows.length} subscriptions`);
 }
 
 // Очистка старых данных

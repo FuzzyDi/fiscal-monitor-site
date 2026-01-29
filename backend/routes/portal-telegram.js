@@ -401,4 +401,144 @@ router.put('/preferences', async (req, res) => {
   }
 });
 
+// POST /api/v1/portal/telegram/test - Отправить тестовое уведомление
+router.post('/test', async (req, res) => {
+  try {
+    const shopInn = req.shopInn;
+
+    // Получить подписку
+    const subResult = await db.query(`
+      SELECT ns.id, r.title
+      FROM notification_subscriptions ns
+      JOIN registrations r ON r.shop_inn = ns.shop_inn
+      WHERE ns.shop_inn = $1 AND ns.status = 'active' AND ns.expires_at > NOW()
+    `, [shopInn]);
+
+    if (subResult.rows.length === 0) {
+      return res.status(403).json({ error: 'Нет активной подписки' });
+    }
+
+    const subscription = subResult.rows[0];
+
+    // Получить все активные подключения
+    const connResult = await db.query(`
+      SELECT id, telegram_chat_id, telegram_username, telegram_chat_title
+      FROM telegram_connections
+      WHERE subscription_id = $1 AND is_active = true
+    `, [subscription.id]);
+
+    if (connResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Нет активных Telegram подключений' });
+    }
+
+    // Динамический импорт telegram-sender
+    const { sender } = require('../utils/telegram-sender');
+    
+    const portalUrl = process.env.PORTAL_URL || 'https://fiscaldrive.sbg.network';
+    const testMessage = `
+✅ ТЕСТОВОЕ УВЕДОМЛЕНИЕ
+
+Организация: ${subscription.title}
+ИНН: ${shopInn}
+Время: ${new Date().toLocaleString('ru-RU')}
+
+Это тестовое сообщение для проверки работы уведомлений.
+Если вы его видите — всё работает!
+
+Портал: ${portalUrl}/portal
+    `.trim();
+
+    let sentCount = 0;
+    const errors = [];
+
+    for (const conn of connResult.rows) {
+      const result = await sender.send(conn.telegram_chat_id, testMessage);
+      if (result.success) {
+        sentCount++;
+      } else {
+        errors.push(conn.telegram_username || conn.telegram_chat_title || conn.telegram_chat_id);
+      }
+    }
+
+    logger.info(`Test notification sent: ${shopInn}, success: ${sentCount}/${connResult.rows.length}`);
+
+    res.json({
+      success: true,
+      sent_count: sentCount,
+      total_connections: connResult.rows.length,
+      errors: errors.length > 0 ? errors : undefined
+    });
+
+  } catch (error) {
+    logger.error('Error sending test notification:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/v1/portal/telegram/history - История уведомлений
+router.get('/history', async (req, res) => {
+  try {
+    const shopInn = req.shopInn;
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+    const offset = parseInt(req.query.offset) || 0;
+
+    // Получить подписку
+    const subResult = await db.query(`
+      SELECT id FROM notification_subscriptions
+      WHERE shop_inn = $1 AND status = 'active'
+    `, [shopInn]);
+
+    if (subResult.rows.length === 0) {
+      return res.status(403).json({ error: 'Нет активной подписки' });
+    }
+
+    const subscriptionId = subResult.rows[0].id;
+
+    // Получить историю
+    const historyResult = await db.query(`
+      SELECT 
+        nh.id,
+        nh.message_text,
+        nh.alerts_count,
+        nh.delivered,
+        nh.sent_at,
+        tc.telegram_username,
+        tc.telegram_chat_title,
+        tc.telegram_chat_type
+      FROM notification_history nh
+      LEFT JOIN telegram_connections tc ON tc.id = nh.connection_id
+      WHERE nh.subscription_id = $1
+      ORDER BY nh.sent_at DESC
+      LIMIT $2 OFFSET $3
+    `, [subscriptionId, limit, offset]);
+
+    // Получить общее количество
+    const countResult = await db.query(`
+      SELECT COUNT(*) as total
+      FROM notification_history
+      WHERE subscription_id = $1
+    `, [subscriptionId]);
+
+    res.json({
+      history: historyResult.rows.map(h => ({
+        id: h.id,
+        message: h.message_text,
+        alerts_count: h.alerts_count,
+        delivered: h.delivered,
+        sent_at: h.sent_at,
+        recipient: h.telegram_chat_type === 'private' 
+          ? (h.telegram_username ? `@${h.telegram_username}` : 'Личный чат')
+          : (h.telegram_chat_title || 'Группа')
+      })),
+      total: parseInt(countResult.rows[0].total),
+      limit,
+      offset
+    });
+
+  } catch (error) {
+    logger.error('Error fetching history:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

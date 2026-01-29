@@ -13,6 +13,10 @@ export default function TelegramSettings() {
     notify_on_stale: true,
     notify_on_return: true
   });
+  const [testSending, setTestSending] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   const loadStatus = useCallback(async () => {
     setLoading(true);
@@ -130,6 +134,45 @@ export default function TelegramSettings() {
     } catch (error) {
       alert('Ошибка: ' + (error.response?.data?.error || error.message));
     }
+  };
+
+  const handleSendTest = async () => {
+    setTestSending(true);
+    try {
+      const token = localStorage.getItem('portalToken');
+      const response = await portalApi.sendTelegramTest(token);
+      const data = response.data;
+      
+      if (data.sent_count === data.total_connections) {
+        alert(`✅ Тестовое уведомление отправлено (${data.sent_count} получателей)`);
+      } else {
+        alert(`Отправлено ${data.sent_count} из ${data.total_connections}. Ошибки: ${data.errors?.join(', ')}`);
+      }
+    } catch (error) {
+      alert('Ошибка: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setTestSending(false);
+    }
+  };
+
+  const loadHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const token = localStorage.getItem('portalToken');
+      const response = await portalApi.getTelegramHistory(token, 20, 0);
+      setHistory(response.data.history || []);
+    } catch (error) {
+      console.error('Failed to load history:', error);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const toggleHistory = () => {
+    if (!showHistory && history.length === 0) {
+      loadHistory();
+    }
+    setShowHistory(!showHistory);
   };
 
   if (loading) {
@@ -405,13 +448,73 @@ export default function TelegramSettings() {
                 </label>
               </div>
 
+              <div className="flex gap-2">
+                <button
+                  onClick={handleSavePreferences}
+                  className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600"
+                >
+                  Сохранить настройки
+                </button>
+                <button
+                  onClick={handleSendTest}
+                  disabled={testSending}
+                  className="bg-green-500 text-white px-6 py-2 rounded hover:bg-green-600 disabled:opacity-50"
+                >
+                  {testSending ? 'Отправка...' : '📤 Тест'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* История уведомлений */}
+        {status?.subscription?.status === 'active' && (status?.connections?.length > 0 || status?.connection) && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">История уведомлений</h2>
               <button
-                onClick={handleSavePreferences}
-                className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600"
+                onClick={toggleHistory}
+                className="text-blue-500 hover:text-blue-700"
               >
-                Сохранить настройки
+                {showHistory ? 'Скрыть' : 'Показать'}
               </button>
             </div>
+
+            {showHistory && (
+              <div>
+                {historyLoading ? (
+                  <p className="text-gray-600">Загрузка...</p>
+                ) : history.length === 0 ? (
+                  <p className="text-gray-600">История пуста</p>
+                ) : (
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {history.map((item) => (
+                      <div 
+                        key={item.id} 
+                        className={`p-3 rounded border ${item.delivered ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="text-xs text-gray-500">
+                            {new Date(item.sent_at).toLocaleString('ru-RU')}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            → {item.recipient}
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-800">
+                          {item.alerts_count > 0 && (
+                            <span className="font-medium">Алертов: {item.alerts_count} • </span>
+                          )}
+                          <span className={item.delivered ? 'text-green-600' : 'text-red-600'}>
+                            {item.delivered ? '✓ Доставлено' : '✕ Ошибка'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

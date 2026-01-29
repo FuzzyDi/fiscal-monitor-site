@@ -5,6 +5,7 @@ import { adminApi } from '../../lib/api';
 export default function TelegramSubscriptions() {
   const [requests, setRequests] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
+  const [statistics, setStatistics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('requests');
 
@@ -20,9 +21,12 @@ export default function TelegramSubscriptions() {
       if (activeTab === 'requests') {
         const res = await adminApi.getTelegramRequests(adminKey, 'pending');
         setRequests(res.data.requests || []);
-      } else {
+      } else if (activeTab === 'subscriptions') {
         const res = await adminApi.getTelegramSubscriptions(adminKey);
         setSubscriptions(res.data.subscriptions || []);
+      } else if (activeTab === 'statistics') {
+        const res = await adminApi.getTelegramStatistics(adminKey);
+        setStatistics(res.data);
       }
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -137,6 +141,12 @@ export default function TelegramSubscriptions() {
           >
             Активные подписки ({subscriptions.length})
           </button>
+          <button
+            onClick={() => setActiveTab('statistics')}
+            className={`px-4 py-2 ml-4 ${activeTab === 'statistics' ? 'border-b-2 border-blue-500 text-blue-500' : 'text-gray-500'}`}
+          >
+            📊 Статистика
+          </button>
         </div>
 
         {loading ? (
@@ -147,15 +157,126 @@ export default function TelegramSubscriptions() {
             onApprove={handleApprove}
             onReject={handleReject}
           />
-        ) : (
+        ) : activeTab === 'subscriptions' ? (
           <SubscriptionsTable 
             subscriptions={subscriptions}
             onExtend={handleExtend}
             onCancel={handleCancel}
           />
-        )}
+        ) : activeTab === 'statistics' && statistics ? (
+          <StatisticsPanel statistics={statistics} />
+        ) : null}
       </div>
     </AdminLayout>
+  );
+}
+
+function StatisticsPanel({ statistics }) {
+  return (
+    <div className="space-y-6">
+      {/* Основные метрики */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white shadow rounded-lg p-4">
+          <h3 className="text-sm text-gray-500 mb-1">Активных подписок</h3>
+          <p className="text-3xl font-bold text-green-600">{statistics.subscriptions.active}</p>
+          <p className="text-xs text-gray-400 mt-1">
+            истекает скоро: {statistics.subscriptions.expiring_soon}
+          </p>
+        </div>
+        <div className="bg-white shadow rounded-lg p-4">
+          <h3 className="text-sm text-gray-500 mb-1">Telegram подключений</h3>
+          <p className="text-3xl font-bold text-blue-600">{statistics.connections.active}</p>
+          <p className="text-xs text-gray-400 mt-1">
+            личных: {statistics.connections.private_chats}, групп: {statistics.connections.group_chats}
+          </p>
+        </div>
+        <div className="bg-white shadow rounded-lg p-4">
+          <h3 className="text-sm text-gray-500 mb-1">Ожидают одобрения</h3>
+          <p className="text-3xl font-bold text-yellow-600">{statistics.requests.pending}</p>
+        </div>
+        <div className="bg-white shadow rounded-lg p-4">
+          <h3 className="text-sm text-gray-500 mb-1">В очереди отправки</h3>
+          <p className="text-3xl font-bold text-purple-600">{statistics.queue.pending}</p>
+        </div>
+      </div>
+
+      {/* Уведомления за 30 дней */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Уведомления за 30 дней</h3>
+        <div className="grid grid-cols-4 gap-4 text-center">
+          <div>
+            <p className="text-2xl font-bold text-gray-900">{statistics.notifications_30d.total}</p>
+            <p className="text-sm text-gray-500">всего</p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-green-600">{statistics.notifications_30d.delivered}</p>
+            <p className="text-sm text-gray-500">доставлено</p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-red-600">{statistics.notifications_30d.failed}</p>
+            <p className="text-sm text-gray-500">ошибок</p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-orange-600">{statistics.notifications_30d.total_alerts}</p>
+            <p className="text-sm text-gray-500">алертов</p>
+          </div>
+        </div>
+      </div>
+
+      {/* По дням */}
+      {statistics.daily_stats.length > 0 && (
+        <div className="bg-white shadow rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">По дням (последние 14)</h3>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2 text-gray-600">Дата</th>
+                  <th className="text-right py-2 text-gray-600">Уведомлений</th>
+                  <th className="text-right py-2 text-gray-600">Алертов</th>
+                </tr>
+              </thead>
+              <tbody>
+                {statistics.daily_stats.map((day) => (
+                  <tr key={day.date} className="border-b">
+                    <td className="py-2 text-gray-900">{new Date(day.date).toLocaleDateString('ru-RU')}</td>
+                    <td className="py-2 text-right text-gray-900">{day.notifications}</td>
+                    <td className="py-2 text-right text-gray-900">{day.alerts}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Топ проблемных */}
+      {statistics.top_problematic.length > 0 && (
+        <div className="bg-white shadow rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Топ-10 проблемных ИНН (30 дней)</h3>
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-2 text-gray-600">Компания</th>
+                <th className="text-left py-2 text-gray-600">ИНН</th>
+                <th className="text-right py-2 text-gray-600">Алертов</th>
+                <th className="text-right py-2 text-gray-600">Уведомлений</th>
+              </tr>
+            </thead>
+            <tbody>
+              {statistics.top_problematic.map((item, idx) => (
+                <tr key={item.shop_inn} className="border-b">
+                  <td className="py-2 text-gray-900">{item.title || '-'}</td>
+                  <td className="py-2 text-gray-600">{item.shop_inn}</td>
+                  <td className="py-2 text-right font-semibold text-red-600">{item.total_alerts}</td>
+                  <td className="py-2 text-right text-gray-900">{item.notifications}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
 

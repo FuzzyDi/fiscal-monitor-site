@@ -116,6 +116,11 @@ export const adminApi = {
       responseType: 'blob'
     }),
 
+  getTelegramStatistics: (key) =>
+    axios.get(`${API_URL}/api/v1/admin/telegram/statistics`, {
+      headers: { 'X-Admin-Key': key }
+    }),
+
   // Export state to Excel
   exportState: (key, shopInn = null, shopNumber = null, severity = null) => {
     const params = {};
@@ -173,6 +178,17 @@ export const portalApi = {
   updateTelegramPreferences: (token, preferences) =>
     axios.put(`${API_URL}/api/v1/portal/telegram/preferences`, preferences, {
       headers: { 'X-Token': token, 'Content-Type': 'application/json' }
+    }),
+
+  sendTelegramTest: (token) =>
+    axios.post(`${API_URL}/api/v1/portal/telegram/test`, {}, {
+      headers: { 'X-Token': token }
+    }),
+
+  getTelegramHistory: (token, limit = 50, offset = 0) =>
+    axios.get(`${API_URL}/api/v1/portal/telegram/history`, {
+      headers: { 'X-Token': token },
+      params: { limit, offset }
     })
 };
 

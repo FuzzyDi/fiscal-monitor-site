@@ -542,4 +542,128 @@ router.get('/export', async (req, res) => {
   }
 });
 
+// GET /api/v1/admin/telegram/statistics - Статистика Telegram уведомлений
+router.get('/statistics', async (req, res) => {
+  try {
+    // Общая статистика подписок
+    const subsStats = await db.query(`
+      SELECT 
+        COUNT(*) FILTER (WHERE status = 'active' AND expires_at > NOW()) as active_subscriptions,
+        COUNT(*) FILTER (WHERE status = 'active' AND expires_at <= NOW()) as expired_subscriptions,
+        COUNT(*) FILTER (WHERE status = 'active' AND expires_at <= NOW() + INTERVAL '7 days' AND expires_at > NOW()) as expiring_soon,
+        COUNT(*) as total_subscriptions
+      FROM notification_subscriptions
+    `);
+
+    // Статистика подключений
+    const connStats = await db.query(`
+      SELECT 
+        COUNT(*) FILTER (WHERE is_active = true) as active_connections,
+        COUNT(*) FILTER (WHERE telegram_chat_type = 'private' AND is_active = true) as private_chats,
+        COUNT(*) FILTER (WHERE telegram_chat_type IN ('group', 'supergroup') AND is_active = true) as group_chats,
+        COUNT(*) as total_connections
+      FROM telegram_connections
+    `);
+
+    // Статистика запросов
+    const reqStats = await db.query(`
+      SELECT 
+        COUNT(*) FILTER (WHERE status = 'pending') as pending_requests,
+        COUNT(*) FILTER (WHERE status = 'approved') as approved_requests,
+        COUNT(*) FILTER (WHERE status = 'rejected') as rejected_requests
+      FROM notification_subscription_requests
+    `);
+
+    // Статистика уведомлений (за последние 30 дней)
+    const notifStats = await db.query(`
+      SELECT 
+        COUNT(*) as total_notifications,
+        COUNT(*) FILTER (WHERE delivered = true) as delivered,
+        COUNT(*) FILTER (WHERE delivered = false) as failed,
+        SUM(alerts_count) as total_alerts
+      FROM notification_history
+      WHERE sent_at > NOW() - INTERVAL '30 days'
+    `);
+
+    // Уведомления по дням (за последние 14 дней)
+    const dailyStats = await db.query(`
+      SELECT 
+        DATE(sent_at) as date,
+        COUNT(*) as notifications,
+        SUM(alerts_count) as alerts
+      FROM notification_history
+      WHERE sent_at > NOW() - INTERVAL '14 days'
+      GROUP BY DATE(sent_at)
+      ORDER BY date DESC
+    `);
+
+    // Топ-10 проблемных ИНН (по количеству алертов за 30 дней)
+    const topProblematic = await db.query(`
+      SELECT 
+        ns.shop_inn,
+        r.title,
+        SUM(nh.alerts_count) as total_alerts,
+        COUNT(nh.id) as notifications_count
+      FROM notification_history nh
+      JOIN notification_subscriptions ns ON ns.id = nh.subscription_id
+      LEFT JOIN registrations r ON r.shop_inn = ns.shop_inn
+      WHERE nh.sent_at > NOW() - INTERVAL '30 days'
+      GROUP BY ns.shop_inn, r.title
+      ORDER BY total_alerts DESC
+      LIMIT 10
+    `);
+
+    // Очередь уведомлений
+    const queueStats = await db.query(`
+      SELECT COUNT(*) as pending_queue
+      FROM notification_queue
+      WHERE processed = false
+    `);
+
+    res.json({
+      subscriptions: {
+        active: parseInt(subsStats.rows[0].active_subscriptions) || 0,
+        expired: parseInt(subsStats.rows[0].expired_subscriptions) || 0,
+        expiring_soon: parseInt(subsStats.rows[0].expiring_soon) || 0,
+        total: parseInt(subsStats.rows[0].total_subscriptions) || 0
+      },
+      connections: {
+        active: parseInt(connStats.rows[0].active_connections) || 0,
+        private_chats: parseInt(connStats.rows[0].private_chats) || 0,
+        group_chats: parseInt(connStats.rows[0].group_chats) || 0,
+        total: parseInt(connStats.rows[0].total_connections) || 0
+      },
+      requests: {
+        pending: parseInt(reqStats.rows[0].pending_requests) || 0,
+        approved: parseInt(reqStats.rows[0].approved_requests) || 0,
+        rejected: parseInt(reqStats.rows[0].rejected_requests) || 0
+      },
+      notifications_30d: {
+        total: parseInt(notifStats.rows[0].total_notifications) || 0,
+        delivered: parseInt(notifStats.rows[0].delivered) || 0,
+        failed: parseInt(notifStats.rows[0].failed) || 0,
+        total_alerts: parseInt(notifStats.rows[0].total_alerts) || 0
+      },
+      daily_stats: dailyStats.rows.map(d => ({
+        date: d.date,
+        notifications: parseInt(d.notifications) || 0,
+        alerts: parseInt(d.alerts) || 0
+      })),
+      top_problematic: topProblematic.rows.map(t => ({
+        shop_inn: t.shop_inn,
+        title: t.title,
+        total_alerts: parseInt(t.total_alerts) || 0,
+        notifications: parseInt(t.notifications_count) || 0
+      })),
+      queue: {
+        pending: parseInt(queueStats.rows[0].pending_queue) || 0
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error fetching statistics:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;
