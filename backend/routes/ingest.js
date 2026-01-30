@@ -9,6 +9,7 @@ const {
 } = require('../utils/helpers');
 const { 
   analyzeAndGenerateAlerts, 
+  generateErrorAlerts,
   mergeAlerts 
 } = require('../utils/alert-analyzer');
 
@@ -55,6 +56,8 @@ function enrichFiscal(fiscal) {
       out.fmFillPercent = Math.round((cnt / max) * 1000) / 10; // 0.1%
     }
   }
+
+  // lastOnlineTime остаётся как есть для OFFLINE проверки
 
   return out;
 }
@@ -159,7 +162,9 @@ router.post('/snapshot', async (req, res) => {
       posIp,
       alerts: clientAlerts,
       fiscal,
-      severity: clientSeverity
+      severity: clientSeverity,
+      error: agentError,  // Agent v2 error field
+      agentVersion        // Agent version for logging
     } = snapshot;
 
     const shopInnNorm = toStrOrNull(shopInn);
@@ -174,9 +179,15 @@ router.post('/snapshot', async (req, res) => {
     
     const fiscalEnriched = enrichFiscal(fiscal);
 
-    // Optional server-side alerts from fiscal metrics. Off by default; agent usually sends alerts.
-    const autoAlertsEnabled = String(process.env.AUTO_ALERTS_ENABLED || 'false').toLowerCase() === 'true';
-    const autoAlerts = autoAlertsEnabled ? analyzeAndGenerateAlerts(fiscalEnriched) : [];
+    // Server-side alerts from fiscal metrics. Enabled by default - agent sends raw data only.
+    const autoAlertsEnabled = String(process.env.AUTO_ALERTS_ENABLED || 'true').toLowerCase() === 'true';
+    let autoAlerts = autoAlertsEnabled ? analyzeAndGenerateAlerts(fiscalEnriched) : [];
+    
+    // Handle agent error (v2 format)
+    if (agentError) {
+      const errorAlerts = generateErrorAlerts(agentError);
+      autoAlerts = [...autoAlerts, ...errorAlerts];
+    }
     
     // Merge client alerts with auto-generated alerts
     const alerts = mergeAlerts(clientAlerts, autoAlerts);
@@ -254,7 +265,7 @@ router.post('/snapshot', async (req, res) => {
       }
     }
     
-    logger.info(`Snapshot ingested: ${stateKey} (severity: ${severity || 'none'}, alerts: ${alerts.length})`);
+    logger.info(`Snapshot ingested: ${stateKey} (severity: ${severity || 'none'}, alerts: ${alerts.length}${agentVersion ? ', agent: ' + agentVersion : ''})`);
     
     // Queue notifications for Telegram (async, don't block response)
     if (isRegistered && severity && severity !== 'INFO' && alerts.length > 0) {

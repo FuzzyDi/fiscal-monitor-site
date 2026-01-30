@@ -72,10 +72,10 @@ export default function Documentation() {
             <div className="mb-6">
               <h3 className="font-semibold text-gray-900 mb-2">Системные требования:</h3>
               <ul className="list-disc list-inside text-gray-700 space-y-1">
-                <li>Windows Server 2012 R2 или новее</li>
-                <li>Установленный Set Retail 10</li>
+                <li>Linux (TinyCore, Ubuntu 18.04+, Debian 10+)</li>
+                <li>Установленный FiscalDriveService</li>
                 <li>Доступ к интернету (HTTPS порт 443)</li>
-                <li>Права администратора для установки службы</li>
+                <li>curl, jq (для bash-версии)</li>
               </ul>
             </div>
 
@@ -86,35 +86,43 @@ export default function Documentation() {
                   <span className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold mr-3">1</span>
                   <div>
                     <p className="font-medium text-gray-900">Скачайте архив</p>
-                    <p className="text-gray-600 text-sm">Загрузите <a href="/downloads/fiscal-agent-win.zip" className="text-blue-600 hover:underline">fiscal-agent-win.zip</a> на сервер</p>
+                    <div className="bg-gray-100 rounded p-2 mt-1">
+                      <code className="text-sm text-gray-800">curl -O https://fiscaldrive.sbg.network/downloads/fiscal-agent-linux.tar.gz</code>
+                    </div>
                   </div>
                 </li>
                 <li className="flex items-start">
                   <span className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold mr-3">2</span>
                   <div>
-                    <p className="font-medium text-gray-900">Распакуйте архив</p>
-                    <p className="text-gray-600 text-sm">Рекомендуемый путь: <code className="bg-gray-100 px-1 rounded">C:\FiscalAgent\</code></p>
+                    <p className="font-medium text-gray-900">Распакуйте и установите</p>
+                    <div className="bg-gray-100 rounded p-2 mt-1">
+                      <code className="text-sm text-gray-800">tar -xzf fiscal-agent-linux.tar.gz && cd fiscal-agent && sudo ./install.sh</code>
+                    </div>
                   </div>
                 </li>
                 <li className="flex items-start">
                   <span className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold mr-3">3</span>
                   <div>
                     <p className="font-medium text-gray-900">Настройте config.json</p>
-                    <p className="text-gray-600 text-sm">Укажите URL сервера и ИНН организации (см. раздел 3)</p>
+                    <div className="bg-gray-100 rounded p-2 mt-1">
+                      <code className="text-sm text-gray-800">sudo nano /etc/fiscal-agent/config.json</code>
+                    </div>
                   </div>
                 </li>
                 <li className="flex items-start">
                   <span className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold mr-3">4</span>
                   <div>
-                    <p className="font-medium text-gray-900">Установите службу</p>
-                    <p className="text-gray-600 text-sm">Запустите <code className="bg-gray-100 px-1 rounded">install.bat</code> от имени администратора</p>
+                    <p className="font-medium text-gray-900">Запустите службу</p>
+                    <div className="bg-gray-100 rounded p-2 mt-1">
+                      <code className="text-sm text-gray-800">sudo systemctl start fiscal-agent && sudo systemctl enable fiscal-agent</code>
+                    </div>
                   </div>
                 </li>
                 <li className="flex items-start">
                   <span className="flex-shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold mr-3">✓</span>
                   <div>
                     <p className="font-medium text-gray-900">Готово!</p>
-                    <p className="text-gray-600 text-sm">Служба запустится автоматически и начнёт отправлять данные</p>
+                    <p className="text-gray-600 text-sm">Агент запустится и начнёт отправлять данные каждые 5 минут</p>
                   </div>
                 </li>
               </ol>
@@ -126,15 +134,17 @@ export default function Documentation() {
             <h2 className="text-xl font-bold text-gray-900 mb-4">3. Настройка агента</h2>
             
             <p className="text-gray-700 mb-4">
-              Откройте файл <code className="bg-gray-100 px-1 rounded">config.json</code> в текстовом редакторе:
+              Откройте файл <code className="bg-gray-100 px-1 rounded">/etc/fiscal-agent/config.json</code>:
             </p>
 
             <div className="bg-gray-900 rounded-lg p-4 mb-4 overflow-x-auto">
               <pre className="text-green-400 text-sm font-mono">{`{
   "server_url": "https://fiscaldrive.sbg.network",
   "shop_inn": "123456789012",
-  "interval_minutes": 5,
-  "set_retail_path": "C:\\\\SetRetail10",
+  "shop_number": "1",
+  "pos_number": "1",
+  "interval_seconds": 300,
+  "fiscal_api_url": "http://127.0.0.1:3449",
   "log_level": "info"
 }`}</pre>
             </div>
@@ -145,37 +155,41 @@ export default function Documentation() {
                   <tr className="border-b">
                     <th className="text-left py-2 px-3 font-semibold text-gray-900">Параметр</th>
                     <th className="text-left py-2 px-3 font-semibold text-gray-900">Описание</th>
-                    <th className="text-left py-2 px-3 font-semibold text-gray-900">Пример</th>
                   </tr>
                 </thead>
                 <tbody className="text-gray-700">
                   <tr className="border-b">
                     <td className="py-2 px-3"><code className="bg-gray-100 px-1 rounded">server_url</code></td>
                     <td className="py-2 px-3">URL сервера мониторинга</td>
-                    <td className="py-2 px-3">https://fiscaldrive.sbg.network</td>
                   </tr>
                   <tr className="border-b">
                     <td className="py-2 px-3"><code className="bg-gray-100 px-1 rounded">shop_inn</code></td>
                     <td className="py-2 px-3">ИНН организации (12 цифр)</td>
-                    <td className="py-2 px-3">123456789012</td>
                   </tr>
                   <tr className="border-b">
-                    <td className="py-2 px-3"><code className="bg-gray-100 px-1 rounded">interval_minutes</code></td>
-                    <td className="py-2 px-3">Интервал отправки данных (минуты)</td>
-                    <td className="py-2 px-3">5</td>
+                    <td className="py-2 px-3"><code className="bg-gray-100 px-1 rounded">shop_number</code></td>
+                    <td className="py-2 px-3">Номер магазина</td>
                   </tr>
                   <tr className="border-b">
-                    <td className="py-2 px-3"><code className="bg-gray-100 px-1 rounded">set_retail_path</code></td>
-                    <td className="py-2 px-3">Путь к Set Retail 10</td>
-                    <td className="py-2 px-3">C:\\SetRetail10</td>
+                    <td className="py-2 px-3"><code className="bg-gray-100 px-1 rounded">pos_number</code></td>
+                    <td className="py-2 px-3">Номер кассы</td>
+                  </tr>
+                  <tr className="border-b">
+                    <td className="py-2 px-3"><code className="bg-gray-100 px-1 rounded">interval_seconds</code></td>
+                    <td className="py-2 px-3">Интервал отправки (по умолчанию 300 сек = 5 мин)</td>
                   </tr>
                   <tr>
-                    <td className="py-2 px-3"><code className="bg-gray-100 px-1 rounded">log_level</code></td>
-                    <td className="py-2 px-3">Уровень логирования</td>
-                    <td className="py-2 px-3">info / debug / error</td>
+                    <td className="py-2 px-3"><code className="bg-gray-100 px-1 rounded">fiscal_api_url</code></td>
+                    <td className="py-2 px-3">URL FiscalDriveService API</td>
                   </tr>
                 </tbody>
               </table>
+            </div>
+
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>Важно:</strong> Агент отправляет только сырые данные. Вся логика алертов и уведомлений — на сервере.
+              </p>
             </div>
           </section>
 
@@ -199,7 +213,7 @@ export default function Documentation() {
             </div>
 
             <p className="text-gray-700">
-              Вход в портал: <a href="/portal/login" className="text-blue-600 hover:underline">/portal/login</a>
+              Вход в портал: <Link href="/portal/login" className="text-blue-600 hover:underline">/portal/login</Link>
             </p>
           </section>
 

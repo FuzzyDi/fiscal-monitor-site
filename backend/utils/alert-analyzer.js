@@ -1,135 +1,168 @@
 /**
- * Analyze fiscal data and generate alerts based on thresholds
+ * Анализ данных ФМ и генерация алертов
  * 
- * Thresholds aligned with sbg-fiscal-agent:
+ * Пороги:
  * 
- * Z_REMAINING (shifts until FM replacement):
- *   <= 2  -> CRITICAL
- *   <= 5  -> DANGER
- *   <= 10 -> WARN
- *   <= 20 -> INFO
+ * Z_REMAINING (смен до замены ФМ):
+ *   <= 5   -> CRITICAL
+ *   <= 15  -> DANGER  
+ *   <= 30  -> WARN
+ *   <= 50  -> INFO
  * 
- * UNSENT (documents waiting to send to OFD):
+ * UNSENT (неотправленные документы в ОФД):
  *   >= 20 -> CRITICAL
- *   >= 15 -> DANGER
- *   >= 10 -> WARN
- *   >= 5  -> INFO
+ *   >= 10 -> DANGER
+ *   >= 5  -> WARN
+ *   >= 1  -> INFO
  * 
- * FM_FILL (ReceiptCount / ReceiptMaxCount percentage):
- *   >= 50% -> CRITICAL
+ * FM_FILL (заполнение памяти ФМ):
+ *   >= 30% -> CRITICAL
  *   >= 20% -> DANGER
  *   >= 10% -> WARN
  *   >= 5%  -> INFO
+ * 
+ * OFFLINE (время без связи с ОФД при наличии неотправленных):
+ *   >= 720 мин (12ч) -> CRITICAL
+ *   >= 240 мин (4ч)  -> DANGER
+ *   >= 60 мин (1ч)   -> WARN
  */
 function analyzeAndGenerateAlerts(fiscal) {
   if (!fiscal) return [];
   
   const alerts = [];
   
-  // Z_REMAINING - shifts remaining until FM needs replacement
-  // 1 shift ≈ 1 day, so these thresholds are in days
+  // Z_REMAINING - смен до замены ФМ (1 смена ≈ 1 день)
   if (fiscal.zRemaining !== undefined && fiscal.zRemaining !== null) {
     const zRemaining = fiscal.zRemaining;
     
-    if (zRemaining <= 2) {
+    if (zRemaining <= 5) {
       alerts.push({
         type: 'Z_REMAINING_CRITICAL',
         severity: 'CRITICAL',
         value: zRemaining,
-        message: `CRITICAL: Only ${zRemaining} shifts remaining! Replace FM immediately!`
+        message: `КРИТИЧНО: Осталось ${zRemaining} смен! Срочно заменить ФМ!`
       });
-    } else if (zRemaining <= 5) {
+    } else if (zRemaining <= 15) {
       alerts.push({
         type: 'Z_REMAINING_DANGER',
         severity: 'DANGER',
         value: zRemaining,
-        message: `Danger: Only ${zRemaining} shifts remaining. Urgent replacement needed.`
+        message: `Опасно: Осталось ${zRemaining} смен. Требуется замена ФМ.`
       });
-    } else if (zRemaining <= 10) {
+    } else if (zRemaining <= 30) {
       alerts.push({
         type: 'Z_REMAINING_WARN',
         severity: 'WARN',
         value: zRemaining,
-        message: `Warning: ${zRemaining} shifts remaining. Order replacement FM.`
+        message: `Внимание: Осталось ${zRemaining} смен. Закажите замену ФМ.`
       });
-    } else if (zRemaining <= 20) {
+    } else if (zRemaining <= 50) {
       alerts.push({
         type: 'Z_REMAINING_INFO',
         severity: 'INFO',
         value: zRemaining,
-        message: `Info: ${zRemaining} shifts remaining. Plan replacement.`
+        message: `Инфо: Осталось ${zRemaining} смен. Запланируйте замену.`
       });
     }
   }
   
-  // UNSENT - documents in FiscalDriveAPI DB waiting to send to OFD
-  if (fiscal.unsentCount !== undefined && fiscal.unsentCount !== null) {
-    const unsentCount = fiscal.unsentCount;
-    
+  // UNSENT - неотправленные документы в ОФД
+  const unsentCount = fiscal.unsentCount;
+  if (unsentCount !== undefined && unsentCount !== null && unsentCount > 0) {
     if (unsentCount >= 20) {
       alerts.push({
         type: 'UNSENT_CRITICAL',
         severity: 'CRITICAL',
         value: unsentCount,
-        message: `CRITICAL: ${unsentCount} unsent documents! Check OFD connection!`
+        message: `КРИТИЧНО: ${unsentCount} неотправленных документов! Проверьте связь с ОФД!`
       });
-    } else if (unsentCount >= 15) {
+    } else if (unsentCount >= 10) {
       alerts.push({
         type: 'UNSENT_DANGER',
         severity: 'DANGER',
         value: unsentCount,
-        message: `Danger: ${unsentCount} unsent documents. Connection issues.`
+        message: `Опасно: ${unsentCount} неотправленных документов. Проблемы со связью.`
       });
-    } else if (unsentCount >= 10) {
+    } else if (unsentCount >= 5) {
       alerts.push({
         type: 'UNSENT_WARN',
         severity: 'WARN',
         value: unsentCount,
-        message: `Warning: ${unsentCount} unsent documents pending.`
+        message: `Внимание: ${unsentCount} неотправленных документов.`
       });
-    } else if (unsentCount >= 5) {
+    } else {
       alerts.push({
         type: 'UNSENT_INFO',
         severity: 'INFO',
         value: unsentCount,
-        message: `Info: ${unsentCount} unsent documents.`
+        message: `Инфо: ${unsentCount} документ(ов) ожидает отправки.`
       });
     }
   }
 
-  // FM_FILL - FM memory fill percentage (receiptCount / receiptMaxCount)
-  // This is CRITICAL - if FM memory fills up, POS cannot register receipts!
+  // FM_FILL - заполнение памяти ФМ
   if (fiscal.fmFillPercent !== undefined && fiscal.fmFillPercent !== null) {
     const fmFill = fiscal.fmFillPercent;
     
-    if (fmFill >= 50) {
+    if (fmFill >= 30) {
       alerts.push({
         type: 'FM_FILL_CRITICAL',
         severity: 'CRITICAL',
         value: fmFill,
-        message: `CRITICAL: FM memory ${fmFill}% full! POS may stop working!`
+        message: `КРИТИЧНО: Память ФМ заполнена на ${fmFill}%! Касса может остановиться!`
       });
     } else if (fmFill >= 20) {
       alerts.push({
         type: 'FM_FILL_DANGER',
         severity: 'DANGER',
         value: fmFill,
-        message: `Danger: FM memory ${fmFill}% full. Check OFD connection.`
+        message: `Опасно: Память ФМ заполнена на ${fmFill}%. Проверьте связь с ОФД.`
       });
     } else if (fmFill >= 10) {
       alerts.push({
         type: 'FM_FILL_WARN',
         severity: 'WARN',
         value: fmFill,
-        message: `Warning: FM memory ${fmFill}% full.`
+        message: `Внимание: Память ФМ заполнена на ${fmFill}%.`
       });
     } else if (fmFill >= 5) {
       alerts.push({
         type: 'FM_FILL_INFO',
         severity: 'INFO',
         value: fmFill,
-        message: `Info: FM memory ${fmFill}% used.`
+        message: `Инфо: Память ФМ использована на ${fmFill}%.`
       });
+    }
+  }
+  
+  // OFFLINE - время без связи с ОФД (только если есть неотправленные)
+  if (fiscal.lastOnlineTime && unsentCount > 0) {
+    const lastOnline = new Date(fiscal.lastOnlineTime);
+    if (!isNaN(lastOnline.getTime())) {
+      const offlineMinutes = Math.floor((Date.now() - lastOnline.getTime()) / 60000);
+      
+      if (offlineMinutes >= 720) { // 12 часов
+        alerts.push({
+          type: 'OFFLINE_CRITICAL',
+          severity: 'CRITICAL',
+          value: offlineMinutes,
+          message: `КРИТИЧНО: Нет связи с ОФД ${Math.floor(offlineMinutes / 60)} часов! ${unsentCount} неотправленных.`
+        });
+      } else if (offlineMinutes >= 240) { // 4 часа
+        alerts.push({
+          type: 'OFFLINE_DANGER',
+          severity: 'DANGER',
+          value: offlineMinutes,
+          message: `Опасно: Нет связи с ОФД ${Math.floor(offlineMinutes / 60)} часов. ${unsentCount} неотправленных.`
+        });
+      } else if (offlineMinutes >= 60) { // 1 час
+        alerts.push({
+          type: 'OFFLINE_WARN',
+          severity: 'WARN',
+          value: offlineMinutes,
+          message: `Внимание: Нет связи с ОФД ${offlineMinutes} мин. ${unsentCount} неотправленных.`
+        });
+      }
     }
   }
   
@@ -137,13 +170,34 @@ function analyzeAndGenerateAlerts(fiscal) {
 }
 
 /**
- * Merge client alerts with auto-generated alerts
- * Auto-generated alerts have priority
+ * Генерация алертов для ошибок агента
+ */
+function generateErrorAlerts(error) {
+  if (!error) return [];
+  
+  const errorMessages = {
+    'RPC_ERROR': 'Ошибка связи с FiscalDriveService',
+    'NO_FISCAL_DRIVE': 'Фискальный модуль не найден',
+    'FM_NOT_FOUND': 'Фискальный модуль не обнаружен'
+  };
+  
+  const message = errorMessages[error.type] || error.message || 'Неизвестная ошибка';
+  
+  return [{
+    type: error.type || 'AGENT_ERROR',
+    severity: 'CRITICAL',
+    message: `${message}: ${error.message || ''}`
+  }];
+}
+
+/**
+ * Объединение алертов от клиента и авто-генерированных
+ * Авто-генерированные имеют приоритет
  */
 function mergeAlerts(clientAlerts, autoAlerts) {
   const alertMap = new Map();
   
-  // Add client alerts first
+  // Добавляем алерты от клиента
   if (clientAlerts && Array.isArray(clientAlerts)) {
     clientAlerts.forEach(alert => {
       if (alert.type) {
@@ -152,7 +206,7 @@ function mergeAlerts(clientAlerts, autoAlerts) {
     });
   }
   
-  // Override with auto-generated alerts (they have priority)
+  // Перезаписываем авто-генерированными (приоритет)
   autoAlerts.forEach(alert => {
     alertMap.set(alert.type, alert);
   });
@@ -162,5 +216,6 @@ function mergeAlerts(clientAlerts, autoAlerts) {
 
 module.exports = {
   analyzeAndGenerateAlerts,
+  generateErrorAlerts,
   mergeAlerts
 };

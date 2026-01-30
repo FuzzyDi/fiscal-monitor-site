@@ -116,7 +116,7 @@ export default function Home() {
               <div className="flex-1">
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Агент мониторинга</h3>
                 <p className="text-gray-600 mb-4">
-                  Установите агент на сервер с Set Retail 10 для автоматической отправки данных
+                  Установите агент на кассу для автоматической отправки данных. Работает на TinyCore Linux, Ubuntu, Debian.
                 </p>
 
                 <div className="bg-gray-50 rounded-xl p-4 mb-4">
@@ -124,28 +124,28 @@ export default function Home() {
                   <ol className="space-y-2 text-sm text-gray-700">
                     <li className="flex items-start">
                       <span className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold mr-2">1</span>
-                      <span>Скачайте и распакуйте архив на сервер</span>
+                      <span>Скачайте и распакуйте архив на кассу</span>
                     </li>
                     <li className="flex items-start">
                       <span className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold mr-2">2</span>
-                      <span>Отредактируйте <code className="bg-gray-200 px-1 rounded">config.json</code> — укажите URL сервера и ИНН</span>
+                      <span>Отредактируйте <code className="bg-gray-200 px-1 rounded">/etc/fiscal-agent/config.json</code></span>
                     </li>
                     <li className="flex items-start">
                       <span className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold mr-2">3</span>
-                      <span>Запустите <code className="bg-gray-200 px-1 rounded">install.bat</code> для установки службы</span>
+                      <span>Запустите <code className="bg-gray-200 px-1 rounded">sudo ./install.sh</code></span>
                     </li>
                   </ol>
                 </div>
 
                 <div className="flex flex-wrap gap-3">
                   <a
-                    href="/downloads/fiscal-agent-win.zip"
+                    href="/downloads/fiscal-agent-linux.tar.gz"
                     className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
                   >
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                    Скачать для Windows
+                    Скачать для Linux
                   </a>
                   <Link
                     href="/docs"
