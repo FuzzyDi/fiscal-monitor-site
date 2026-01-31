@@ -25,16 +25,7 @@ const INGEST_RL_MAX_PER_HOUR = (() => {
   return Number.isFinite(n) && n > 0 ? n : null;
 })();
 
-function pickClientIp(req) {
-  const xRealIp = req.header('x-real-ip');
-  if (xRealIp) return String(xRealIp).trim();
-  const xff = req.header('x-forwarded-for');
-  if (xff) {
-    const first = String(xff).split(',')[0].trim();
-    if (first) return first;
-  }
-  return (req.socket && req.socket.remoteAddress) ? String(req.socket.remoteAddress) : 'unknown';
-}
+const { pickClientIp } = require('./utils/helpers');
 
 // Middleware
 app.use(helmet({
@@ -56,6 +47,16 @@ app.use(morgan('combined', { stream: { write: msg => logger.info(msg.trim()) } }
 if (INGEST_RL_MAX_PER_HOUR) {
   const windowMs = 60 * 60 * 1000;
   const buckets = new Map(); // key -> { resetAt, count }
+
+  // Periodic cleanup to prevent memory leak
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, item] of buckets) {
+      if (now >= item.resetAt) {
+        buckets.delete(key);
+      }
+    }
+  }, 60 * 1000); // Cleanup every minute
 
   app.use('/api/v1/fiscal', (req, res, next) => {
     const key = pickClientIp(req);
