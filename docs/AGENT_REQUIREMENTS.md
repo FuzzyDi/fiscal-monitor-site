@@ -64,9 +64,13 @@ GET http://127.0.0.1:3449/api/v1/fm/info
   "receiptMaxCount": 500000,
   "unsentCount": 0,
   "lastZReportDate": "2026-01-29",
-  "lastZReportNumber": 245
+  "lastZReportNumber": 245,
+  "lastOnlineTime": "2026-01-29T14:30:00Z"
 }
 ```
+
+> **Важно:** Поле `lastOnlineTime` — время последней успешной отправки в ОФД. 
+> Используется для детектирования проблем со связью (OFFLINE алерты).
 
 ### 3.2 Данные терминала
 Агент также должен знать:

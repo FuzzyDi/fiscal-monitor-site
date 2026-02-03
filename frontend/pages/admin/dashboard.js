@@ -67,7 +67,7 @@ export default function AdminDashboard() {
         localStorage.removeItem('adminKey');
         router.push('/admin/login');
       } else {
-        setError('Failed to load data');
+        setError('Ошибка загрузки данных');
       }
     } finally {
       setLoading(false);
@@ -114,13 +114,13 @@ export default function AdminDashboard() {
           <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
           </svg>
-          Registered
+          Зарегистрирован
         </span>
       );
     }
     return (
       <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-semibold">
-        Unregistered
+        Не зарегистрирован
       </span>
     );
   };
@@ -137,7 +137,7 @@ export default function AdminDashboard() {
   const innDisplayName = (innRow) => {
     if (innRow?.shop_name) return innRow.shop_name;
     const sc = innRow?.shop_count;
-    if (Number.isFinite(Number(sc)) && Number(sc) > 1) return `Multiple shops (${Number(sc)})`;
+    if (Number.isFinite(Number(sc)) && Number(sc) > 1) return `Несколько магазинов (${Number(sc)})`;
     return innRow?.registration_title || '—';
   };
 
@@ -154,13 +154,13 @@ export default function AdminDashboard() {
   return (
     <>
       <Head>
-        <title>Admin Dashboard - Fiscal Monitor</title>
+        <title>Панель управления - Fiscal Monitor</title>
       </Head>
 
       <AdminLayout>
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Dashboard</h1>
-          <p className="text-gray-600">System overview and real-time statistics</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Панель управления</h1>
+          <p className="text-gray-600">Обзор системы и статистика в реальном времени</p>
         </div>
 
         {error && (
@@ -175,7 +175,7 @@ export default function AdminDashboard() {
               {/* Total INNs Card */}
               <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white transform transition-all hover:scale-105 hover:shadow-xl">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="text-sm font-medium opacity-90">Total INNs</div>
+                  <div className="text-sm font-medium opacity-90">Всего ИНН</div>
                   <div className="bg-white bg-opacity-20 rounded-lg p-2">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -197,7 +197,7 @@ export default function AdminDashboard() {
                 }`}
               >
                 <div className="flex items-center justify-between mb-4">
-                  <div className="text-sm font-medium opacity-90">Critical</div>
+                  <div className="text-sm font-medium opacity-90">Критические</div>
                   <div className="bg-white bg-opacity-20 rounded-lg p-2">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -206,7 +206,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="text-4xl font-bold mb-2">{overview.criticalCount}</div>
                 <div className="text-sm opacity-90 flex items-center">
-                  Requires immediate attention
+                  Требуют немедленного внимания
                   <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
@@ -221,7 +221,7 @@ export default function AdminDashboard() {
                 }`}
               >
                 <div className="flex items-center justify-between mb-4">
-                  <div className="text-sm font-medium opacity-90">Danger</div>
+                  <div className="text-sm font-medium opacity-90">Опасные</div>
                   <div className="bg-white bg-opacity-20 rounded-lg p-2">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -230,7 +230,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="text-4xl font-bold mb-2">{overview.dangerCount}</div>
                 <div className="text-sm opacity-90 flex items-center">
-                  Action needed soon
+                  Требуют скорого действия
                   <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
@@ -245,7 +245,7 @@ export default function AdminDashboard() {
                 }`}
               >
                 <div className="flex items-center justify-between mb-4">
-                  <div className="text-sm font-medium opacity-90">Warning</div>
+                  <div className="text-sm font-medium opacity-90">Предупреждения</div>
                   <div className="bg-white bg-opacity-20 rounded-lg p-2">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -254,7 +254,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="text-4xl font-bold mb-2">{overview.warnCount}</div>
                 <div className="text-sm opacity-90 flex items-center">
-                  Monitor closely
+                  Требуют наблюдения
                   <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
@@ -272,7 +272,7 @@ export default function AdminDashboard() {
                     : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-50'
                 }`}
               >
-                By Shops
+                По магазинам
               </button>
               <button
                 onClick={() => setActiveTab('inns')}
@@ -282,7 +282,7 @@ export default function AdminDashboard() {
                     : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-50'
                 }`}
               >
-                By INN
+                По ИНН
               </button>
             </div>
 
@@ -290,12 +290,12 @@ export default function AdminDashboard() {
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
               <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
                 <h2 className="text-xl font-semibold text-white">
-                  {activeTab === 'shops' ? 'Stores' : 'Companies'}
+                  {activeTab === 'shops' ? 'Магазины' : 'Компании'}
                 </h2>
                 <p className="text-blue-100 text-sm mt-1">
                   {activeTab === 'shops'
-                    ? 'One row per INN + shop number'
-                    : 'One row per INN (company-level)'}
+                    ? 'Одна строка на ИНН + номер магазина'
+                    : 'Одна строка на ИНН (уровень компании)'}
                 </p>
               </div>
 
@@ -304,14 +304,14 @@ export default function AdminDashboard() {
                   <table className="w-full">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">INN</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Shop #</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Shop Name</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Registered</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Worst</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ИНН</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">№ магазина</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Название магазина</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Регистрация</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Статус</th>
                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">POS</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Seen</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Последняя связь</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Действия</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -340,7 +340,7 @@ export default function AdminDashboard() {
                               onClick={() => router.push(`/admin/state?inn=${encodeURIComponent(s.shop_inn)}&shopNumber=${encodeURIComponent(String(s.shop_number))}`)}
                               className="text-blue-600 hover:text-blue-800 font-medium inline-flex items-center transition-colors"
                             >
-                              View POS
+                              Смотреть POS
                               <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                               </svg>
@@ -354,14 +354,14 @@ export default function AdminDashboard() {
                   <table className="w-full">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">INN</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Company / Shop Name</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Registered</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Shops</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ИНН</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Компания / Магазин</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Регистрация</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Магазины</th>
                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">POS</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Worst</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Seen</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Статус</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Последняя связь</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Действия</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -390,7 +390,7 @@ export default function AdminDashboard() {
                               onClick={() => router.push(`/admin/state?inn=${encodeURIComponent(inn.shop_inn)}`)}
                               className="text-blue-600 hover:text-blue-800 font-medium inline-flex items-center transition-colors"
                             >
-                              View POS
+                              Смотреть POS
                               <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                               </svg>

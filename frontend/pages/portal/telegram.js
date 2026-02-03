@@ -11,7 +11,10 @@ export default function TelegramSettings() {
     severity_filter: 'DANGER',
     notify_on_recovery: true,
     notify_on_stale: true,
-    notify_on_return: true
+    notify_on_return: true,
+    quiet_hours_enabled: false,
+    quiet_hours_start: '23:00',
+    quiet_hours_end: '08:00'
   });
   const [testSending, setTestSending] = useState(false);
   const [history, setHistory] = useState([]);
@@ -51,7 +54,10 @@ export default function TelegramSettings() {
         
         setPreferences({
           ...data.preferences,
-          severity_filter: severityString
+          severity_filter: severityString,
+          quiet_hours_enabled: data.preferences.quiet_hours_enabled || false,
+          quiet_hours_start: data.preferences.quiet_hours_start || '23:00',
+          quiet_hours_end: data.preferences.quiet_hours_end || '08:00'
         });
       }
     } catch (error) {
@@ -207,7 +213,7 @@ export default function TelegramSettings() {
                 Подписка на Telegram уведомления не активирована.
               </p>
               <p className="text-sm text-gray-600 mb-4">
-                Стоимость: 1000₽/месяц. Получайте мгновенные уведомления о проблемах с кассами.
+                Стоимость: 0000/месяц. Получайте мгновенные уведомления о проблемах с кассами.
               </p>
               
               {status?.request?.status === 'pending' ? (
@@ -446,6 +452,39 @@ export default function TelegramSettings() {
                   />
                   <span className="text-sm text-gray-800">Уведомлять о восстановлении связи</span>
                 </label>
+              </div>
+
+              {/* Тихие часы */}
+              <div className="border-t pt-4 mt-4">
+                <label className="flex items-center mb-3">
+                  <input
+                    type="checkbox"
+                    checked={preferences.quiet_hours_enabled}
+                    onChange={(e) => setPreferences({...preferences, quiet_hours_enabled: e.target.checked})}
+                    className="mr-2"
+                  />
+                  <span className="text-sm font-medium text-gray-800">Тихие часы (не беспокоить ночью)</span>
+                </label>
+                
+                {preferences.quiet_hours_enabled && (
+                  <div className="ml-6 flex items-center gap-2 text-sm text-gray-700">
+                    <span>с</span>
+                    <input
+                      type="time"
+                      value={preferences.quiet_hours_start}
+                      onChange={(e) => setPreferences({...preferences, quiet_hours_start: e.target.value})}
+                      className="border rounded px-2 py-1 text-gray-900"
+                    />
+                    <span>до</span>
+                    <input
+                      type="time"
+                      value={preferences.quiet_hours_end}
+                      onChange={(e) => setPreferences({...preferences, quiet_hours_end: e.target.value})}
+                      className="border rounded px-2 py-1 text-gray-900"
+                    />
+                    <span className="text-xs text-gray-500 ml-2">(уведомления будут отложены)</span>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-2">

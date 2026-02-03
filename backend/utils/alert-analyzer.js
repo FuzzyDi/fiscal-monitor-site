@@ -135,36 +135,14 @@ function analyzeAndGenerateAlerts(fiscal) {
     }
   }
   
-  // OFFLINE - время без связи с ОФД (только если есть неотправленные)
-  if (fiscal.lastOnlineTime && unsentCount > 0) {
-    const lastOnline = new Date(fiscal.lastOnlineTime);
-    if (!isNaN(lastOnline.getTime())) {
-      const offlineMinutes = Math.floor((Date.now() - lastOnline.getTime()) / 60000);
-      
-      if (offlineMinutes >= 720) { // 12 часов
-        alerts.push({
-          type: 'OFFLINE_CRITICAL',
-          severity: 'CRITICAL',
-          value: offlineMinutes,
-          message: `КРИТИЧНО: Нет связи с ОФД ${Math.floor(offlineMinutes / 60)} часов! ${unsentCount} неотправленных.`
-        });
-      } else if (offlineMinutes >= 240) { // 4 часа
-        alerts.push({
-          type: 'OFFLINE_DANGER',
-          severity: 'DANGER',
-          value: offlineMinutes,
-          message: `Опасно: Нет связи с ОФД ${Math.floor(offlineMinutes / 60)} часов. ${unsentCount} неотправленных.`
-        });
-      } else if (offlineMinutes >= 60) { // 1 час
-        alerts.push({
-          type: 'OFFLINE_WARN',
-          severity: 'WARN',
-          value: offlineMinutes,
-          message: `Внимание: Нет связи с ОФД ${offlineMinutes} мин. ${unsentCount} неотправленных.`
-        });
-      }
-    }
-  }
+  // OFFLINE алерт ОТКЛЮЧЕН
+  // Причина: поле LastOnlineTime из FiscalDriveService НЕ отражает реальную связь с ОФД
+  // Факты:
+  // - Кассы с lastOnlineTime "75 часов назад" имеют unsent=0 (всё отправлено)
+  // - Кассы с реальными неотправленными имеют ПУСТОЙ lastOnlineTime
+  // Вывод: это поле означает что-то другое (не время последней успешной отправки)
+  // 
+  // Для определения проблем со связью используйте алерт UNSENT (неотправленные документы)
   
   return alerts;
 }

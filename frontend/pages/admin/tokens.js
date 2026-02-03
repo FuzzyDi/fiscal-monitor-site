@@ -156,13 +156,13 @@ export default function AdminTokens() {
   return (
     <>
       <Head>
-        <title>Access Tokens - Admin - Fiscal Monitor</title>
+        <title>Токены доступа - Админ - Fiscal Monitor</title>
       </Head>
 
       <AdminLayout>
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Access Tokens</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Токены доступа</h1>
             <p className="text-gray-600">Manage client portal access tokens</p>
             {filteredInn && (
               <div className="mt-2 flex items-center gap-2">
@@ -202,7 +202,7 @@ export default function AdminTokens() {
                 </svg>
               </div>
               <div className="flex-1">
-                <h2 className="text-xl font-semibold text-green-900 mb-1">Token Created!</h2>
+                <h2 className="text-xl font-semibold text-green-900 mb-1">Токен создан!</h2>
                 <p className="text-sm text-green-700 mb-4">
                   Save this token securely. It won&apos;t be shown again in full.
                 </p>
@@ -361,7 +361,7 @@ export default function AdminTokens() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Revoke Token</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">Отозвать токен</h3>
                   <p className="text-sm text-gray-500">This action cannot be undone</p>
                 </div>
               </div>
@@ -406,10 +406,10 @@ export default function AdminTokens() {
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Token</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Токен</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">INN</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Label</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Created</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Создан</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Used</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                 </tr>

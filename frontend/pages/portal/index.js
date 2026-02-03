@@ -214,7 +214,7 @@ export default function Portal() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-16 w-16 border-b-4 border-indigo-600"></div>
-          <p className="mt-4 text-gray-600 font-medium">Loading your dashboard...</p>
+          <p className="mt-4 text-gray-600 font-medium">Загрузка панели управления...</p>
         </div>
       </div>
     );
@@ -223,7 +223,7 @@ export default function Portal() {
   return (
     <>
       <Head>
-        <title>Client Portal - Fiscal Monitor</title>
+        <title>Клиентский портал - Fiscal Monitor</title>
       </Head>
 
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50" suppressHydrationWarning>
@@ -270,7 +270,7 @@ export default function Portal() {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="mb-8">
-            <h2 className="text-4xl font-bold text-gray-900 mb-2">Dashboard</h2>
+            <h2 className="text-4xl font-bold text-gray-900 mb-2">Панель управления</h2>
             <p className="text-gray-600">Real-time monitoring of your POS terminals</p>
           </div>
 
@@ -296,7 +296,7 @@ export default function Portal() {
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <div className="text-sm font-medium opacity-90">Critical</div>
+                    <div className="text-sm font-medium opacity-90">Критические</div>
                     {activeFilter === 'CRITICAL' && (
                       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
@@ -314,7 +314,7 @@ export default function Portal() {
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <div className="text-sm font-medium opacity-90">Danger</div>
+                    <div className="text-sm font-medium opacity-90">Опасные</div>
                     {activeFilter === 'DANGER' && (
                       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
@@ -332,7 +332,7 @@ export default function Portal() {
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <div className="text-sm font-medium opacity-90">Warning</div>
+                    <div className="text-sm font-medium opacity-90">Предупреждения</div>
                     {activeFilter === 'WARN' && (
                       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
@@ -469,7 +469,7 @@ export default function Portal() {
 
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
                           <div>
-                            <div className="text-xs text-gray-500 mb-1">Last Update</div>
+                            <div className="text-xs text-gray-500 mb-1">Обновление</div>
                             <div className="text-sm text-gray-900">{formatDate(state.updated_at)}</div>
                           </div>
                           {state.pos_ip && (

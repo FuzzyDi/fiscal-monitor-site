@@ -39,20 +39,17 @@ export default function AdminState() {
       const res = await adminApi.getState(key, inn, shopNumber, severity);
       let filteredStates = res.data.states;
       
-      // Filter by severity if provided (server already filters, but keep as safety)
       if (severity) {
         filteredStates = filteredStates.filter(state =>
           state.severity && state.severity.toUpperCase() === severity.toUpperCase()
         );
       }
 
-      // Filter by shop number if provided (server already filters, but keep as safety)
       if (shopNumber !== null && shopNumber !== undefined && String(shopNumber).trim() !== '') {
         const sn = String(shopNumber).trim();
         filteredStates = filteredStates.filter(state => String(getShopNumber(state)) === sn);
       }
 
-      // Stable default sort: INN -> Shop number -> POS (cash) number.
       const sorted = Array.isArray(filteredStates)
         ? [...filteredStates].sort(compareStates)
         : [];
@@ -79,12 +76,10 @@ export default function AdminState() {
       const { inn, shopNumber, severity } = router.query;
       const response = await adminApi.exportState(adminKey, inn, shopNumber, severity);
 
-      // Create download link
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
       
-      // Generate filename with current date and filters
       let filename = 'pos_state_';
       if (inn) filename += `inn_${inn}_`;
       if (shopNumber) filename += `shop_${shopNumber}_`;
@@ -115,8 +110,8 @@ export default function AdminState() {
   };
 
   const formatDate = (dateStr) => {
-    if (typeof window === 'undefined') return ''; // Skip SSR
-    return new Date(dateStr).toLocaleString();
+    if (typeof window === 'undefined') return '';
+    return new Date(dateStr).toLocaleString('ru-RU');
   };
 
   const getShopNumber = (state) => {
@@ -129,11 +124,6 @@ export default function AdminState() {
     return (v === undefined || v === null || v === '') ? '0' : String(v);
   };
 
-  // Default ordering for /admin/state:
-  // 1) INN (shop_inn) asc
-  // 2) Shop number asc
-  // 3) POS (cash) number asc
-  // Note: we keep the sort robust to missing/non-numeric values.
   const safeString = (v) => (v === undefined || v === null) ? '' : String(v);
   const isDigitsOnly = (s) => /^\d+$/.test(s);
 
@@ -156,7 +146,6 @@ export default function AdminState() {
       if (aa > bb) return 1;
       return 0;
     }
-    // Fallback: natural-ish string comparison.
     return safeString(a).localeCompare(safeString(b), undefined, { numeric: true, sensitivity: 'base' });
   };
 
@@ -177,39 +166,46 @@ export default function AdminState() {
     if (shopCmp !== 0) return shopCmp;
 
     const posCmp = toInt(getPosNumber(a)) - toInt(getPosNumber(b));
-    if (posCmp !== 0) return posCmp;
-
-    // Deterministic tie-breaker.
-    return safeString(a?.state_key).localeCompare(safeString(b?.state_key), undefined, { numeric: true, sensitivity: 'base' });
+    return posCmp;
   };
 
   const getFiscalUnsentCount = (state) => {
-    const v = state?.snapshot?.fiscal?.unsentCount;
-    return typeof v === 'number' ? v : null;
+    const f = state?.snapshot?.fiscal;
+    if (!f) return null;
+    if (f.unsentCount !== undefined) return f.unsentCount;
+    if (f.unsent_count !== undefined) return f.unsent_count;
+    return null;
   };
 
   const getZMetrics = (state) => {
-    const fiscal = state?.snapshot?.fiscal;
-    if (!fiscal || typeof fiscal !== 'object') return null;
-    const zCount = (typeof fiscal.zReportCount === 'number') ? fiscal.zReportCount : fiscal.zCount;
-    const zMax = (typeof fiscal.zReportMaxCount === 'number') ? fiscal.zReportMaxCount : fiscal.zMax;
-    if (typeof zCount !== 'number' || typeof zMax !== 'number') return null;
-    const zRemaining = (typeof fiscal.zRemaining === 'number') ? fiscal.zRemaining : (zMax - zCount);
-    return { zCount, zMax, zRemaining };
-  };
+    const f = state?.snapshot?.fiscal;
+    if (!f) return null;
+	  const zCount =
+		f.zReportCount ??
+		f.z_report_count ??
+		f.zCount;
 
-  const getFiscalField = (fiscal, key, fallbackKey) => {
-    if (!fiscal) return undefined;
-    if (fiscal[key] !== undefined) return fiscal[key];
-    if (fallbackKey && fiscal[fallbackKey] !== undefined) return fiscal[fallbackKey];
-    return undefined;
+	  const zMax =
+		f.zReportMaxCount ??
+		f.z_report_max_count ??
+		f.zMax;
+
+	  const zRemaining =
+		f.zReportsRemaining ??
+		f.z_reports_remaining ??
+		f.zRemaining ??
+		(zMax != null && zCount != null ? zMax - zCount : undefined);
+
+	  if (zCount == null && zMax == null) return null;
+
+	  return { zCount, zMax, zRemaining };
   };
 
   if (loading) {
     return (
       <AdminLayout>
         <div className="flex items-center justify-center h-64">
-          <div className="text-gray-600">Loading...</div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
       </AdminLayout>
     );
@@ -218,19 +214,22 @@ export default function AdminState() {
   return (
     <>
       <Head>
-        <title>State View - Admin - Fiscal Monitor</title>
+        <title>Состояние POS - Fiscal Monitor</title>
       </Head>
 
       <AdminLayout>
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">POS State</h1>
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">Состояние POS</h1>
+            <p className="text-gray-600">Детальная информация по терминалам</p>
+          </div>
+          <div className="flex items-center gap-2">
             {selectedInn && (
               <span className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
                 <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
                 </svg>
-                INN: {selectedInn}
+                ИНН: {selectedInn}
               </span>
             )}
             {selectedShopNumber && (
@@ -238,7 +237,7 @@ export default function AdminState() {
                 <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
                 </svg>
-                Shop: {selectedShopNumber}
+                Магазин: {selectedShopNumber}
               </span>
             )}
             {router.query.severity && (
@@ -260,7 +259,7 @@ export default function AdminState() {
         <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
             <h2 className="text-xl font-semibold text-white">
-              {states.length} POS Terminal{states.length !== 1 ? 's' : ''}
+              {states.length} {states.length === 1 ? 'терминал' : states.length < 5 ? 'терминала' : 'терминалов'}
             </h2>
             <div className="flex items-center gap-3">
               <button
@@ -293,7 +292,7 @@ export default function AdminState() {
                   <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
-                  Clear Filters
+                  Сбросить фильтры
                 </button>
               )}
             </div>
@@ -304,12 +303,12 @@ export default function AdminState() {
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <h3 className="text-lg font-bold text-gray-900 mb-1">
-                      {state.shop_name || 'Unnamed Shop'}
+                      {state.shop_name || 'Без названия'}
                     </h3>
                     <div className="flex items-center gap-2 text-sm text-gray-600 font-mono">
-                      <span className="bg-gray-100 px-2 py-0.5 rounded">INN: {state.shop_inn}</span>
-                      <span className="bg-gray-100 px-2 py-0.5 rounded">Shop: {getShopNumber(state)}</span>
-                      <span className="bg-gray-100 px-2 py-0.5 rounded">POS: {getPosNumber(state)}</span>
+                      <span className="bg-gray-100 px-2 py-0.5 rounded">ИНН: {state.shop_inn}</span>
+                      <span className="bg-gray-100 px-2 py-0.5 rounded">Магазин: {getShopNumber(state)}</span>
+                      <span className="bg-gray-100 px-2 py-0.5 rounded">Касса: {getPosNumber(state)}</span>
                     </div>
                   </div>
                   {state.severity && (
@@ -321,18 +320,18 @@ export default function AdminState() {
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">Last Update</div>
+                    <div className="text-xs text-gray-500 mb-1">Обновлено</div>
                     <div className="text-sm text-gray-900">{formatDate(state.updated_at)}</div>
                   </div>
                   {state.pos_ip && (
                     <div>
-                      <div className="text-xs text-gray-500 mb-1">POS IP</div>
+                      <div className="text-xs text-gray-500 mb-1">IP адрес</div>
                       <div className="text-sm text-gray-900 font-mono">{state.pos_ip}</div>
                     </div>
                   )}
                   {state.snapshot?.fiscal?.terminalId && (
                     <div>
-                      <div className="text-xs text-gray-500 mb-1">Terminal ID</div>
+                      <div className="text-xs text-gray-500 mb-1">Терминал</div>
                       <div className="text-sm text-gray-900 font-mono">{state.snapshot.fiscal.terminalId}</div>
                     </div>
                   )}
@@ -342,13 +341,13 @@ export default function AdminState() {
                   <div className="bg-gray-50 rounded-lg p-4 mb-4">
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                       <div>
-                        <div className="text-xs text-gray-500 mb-1">Receipts</div>
+                        <div className="text-xs text-gray-500 mb-1">Чеки</div>
                         <div className="text-sm text-gray-900">
                           {state.snapshot.fiscal.receiptCount ?? 0} / {state.snapshot.fiscal.receiptMaxCount ?? '∞'}
                         </div>
                       </div>
                       <div>
-                        <div className="text-xs text-gray-500 mb-1">Unsent</div>
+                        <div className="text-xs text-gray-500 mb-1">Не отправлено</div>
                         <div className="text-sm text-gray-900">{getFiscalUnsentCount(state) ?? '-'}</div>
                       </div>
                       {(() => {
@@ -356,10 +355,10 @@ export default function AdminState() {
                         if (!z) return null;
                         return (
                           <div>
-                            <div className="text-xs text-gray-500 mb-1">Shifts (Z Reports)</div>
+                            <div className="text-xs text-gray-500 mb-1">Смены (Z-отчёты)</div>
                             <div className="text-sm text-gray-900">{z.zCount} / {z.zMax}</div>
-                            {typeof z.zRemaining === 'number' && (
-                              <div className="text-xs text-gray-500 mt-1">{z.zRemaining} remaining</div>
+                            {z.zRemaining != null && (
+                              <div className="text-xs text-gray-500 mt-1">{z.zRemaining} осталось</div>
                             )}
                           </div>
                         );
@@ -369,19 +368,19 @@ export default function AdminState() {
                 )}
 
                 <div className="mb-4">
-                  <div className="text-xs text-gray-500 mb-1">Registration Status</div>
+                  <div className="text-xs text-gray-500 mb-1">Статус регистрации</div>
                   <div className="text-sm">
                     {state.is_registered ? (
-                      <span className="text-green-600">✓ Registered</span>
+                      <span className="text-green-600">✓ Зарегистрирован</span>
                     ) : (
-                      <span className="text-gray-500">Not Registered</span>
+                      <span className="text-gray-500">Не зарегистрирован</span>
                     )}
                   </div>
                 </div>
 
                 {state.snapshot?.alerts && state.snapshot.alerts.length > 0 && (
                   <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="text-sm font-medium text-gray-900 mb-2">Alerts</h4>
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">Алерты</h4>
                     <div className="space-y-2">
                       {state.snapshot.alerts.map((alert, idx) => (
                         <div key={idx} className="flex items-start">

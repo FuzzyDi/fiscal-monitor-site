@@ -310,47 +310,6 @@ router.post('/cancel-subscription/:subscriptionId', async (req, res) => {
   }
 });
 
-// GET /api/v1/admin/telegram/statistics - Общая статистика
-router.get('/statistics', async (req, res) => {
-  try {
-    const stats = await db.query(`
-      SELECT
-        (SELECT COUNT(*) FROM notification_subscriptions WHERE status = 'active') as active_subscriptions,
-        (SELECT COUNT(*) FROM notification_subscriptions WHERE status = 'expired') as expired_subscriptions,
-        (SELECT COUNT(*) FROM notification_subscription_requests WHERE status = 'pending') as pending_requests,
-        (SELECT COUNT(*) FROM telegram_connections WHERE is_active = true) as active_connections,
-        (SELECT COUNT(*) FROM telegram_connections WHERE is_active = true AND telegram_chat_type = 'group') as group_connections,
-        (SELECT COUNT(*) FROM telegram_connections WHERE is_active = true AND telegram_chat_type = 'private') as private_connections,
-        (SELECT COUNT(*) FROM notification_history WHERE sent_at > NOW() - INTERVAL '24 hours') as notifications_24h,
-        (SELECT COUNT(*) FROM notification_history WHERE sent_at > NOW() - INTERVAL '7 days') as notifications_7d,
-        (SELECT COUNT(*) FROM notification_history WHERE delivered = false AND sent_at > NOW() - INTERVAL '24 hours') as failed_24h
-    `);
-
-    // Подписки истекающие в течение недели
-    const expiringResult = await db.query(`
-      SELECT 
-        ns.id,
-        ns.shop_inn,
-        r.title as company_name,
-        ns.expires_at
-      FROM notification_subscriptions ns
-      JOIN registrations r ON r.shop_inn = ns.shop_inn
-      WHERE ns.status = 'active' 
-        AND ns.expires_at BETWEEN NOW() AND NOW() + INTERVAL '7 days'
-      ORDER BY ns.expires_at ASC
-    `);
-
-    res.json({
-      statistics: stats.rows[0],
-      expiring_soon: expiringResult.rows
-    });
-
-  } catch (error) {
-    logger.error('Error getting statistics:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
 // GET /api/v1/admin/telegram/export - Экспорт в Excel
 router.get('/export', async (req, res) => {
   try {
@@ -544,6 +503,7 @@ router.get('/export', async (req, res) => {
 
 // GET /api/v1/admin/telegram/statistics - Статистика Telegram уведомлений
 router.get('/statistics', async (req, res) => {
+  logger.info('Statistics endpoint called');
   try {
     // Общая статистика подписок
     const subsStats = await db.query(`

@@ -20,7 +20,10 @@ router.get('/status', async (req, res) => {
         np.severity_filter,
         np.notify_on_recovery,
         np.notify_on_stale,
-        np.notify_on_return
+        np.notify_on_return,
+        np.quiet_hours_enabled,
+        np.quiet_hours_start,
+        np.quiet_hours_end
       FROM notification_subscriptions ns
       LEFT JOIN notification_preferences np ON np.subscription_id = ns.id
       WHERE ns.shop_inn = $1 AND ns.status = 'active' AND ns.expires_at > NOW()
@@ -80,16 +83,14 @@ router.get('/status', async (req, res) => {
       // Для обратной совместимости оставляем connection (первое), добавляем connections (все)
       connection: connResult.rows[0] || null,
       connections: connResult.rows,
-      preferences: subscription.severity_filter ? {
-        severity_filter: subscription.severity_filter,
+      preferences: {
+        severity_filter: subscription.severity_filter || ['DANGER', 'CRITICAL'],
         notify_on_recovery: subscription.notify_on_recovery !== null ? subscription.notify_on_recovery : true,
         notify_on_stale: subscription.notify_on_stale !== null ? subscription.notify_on_stale : true,
-        notify_on_return: subscription.notify_on_return !== null ? subscription.notify_on_return : true
-      } : {
-        severity_filter: ['DANGER', 'CRITICAL'],
-        notify_on_recovery: true,
-        notify_on_stale: true,
-        notify_on_return: true
+        notify_on_return: subscription.notify_on_return !== null ? subscription.notify_on_return : true,
+        quiet_hours_enabled: subscription.quiet_hours_enabled || false,
+        quiet_hours_start: subscription.quiet_hours_start || '23:00',
+        quiet_hours_end: subscription.quiet_hours_end || '08:00'
       },
       active_code: codeResult.rows[0] || null
     });
@@ -339,7 +340,10 @@ router.put('/preferences', async (req, res) => {
       severity_filter, 
       notify_on_recovery, 
       notify_on_stale, 
-      notify_on_return 
+      notify_on_return,
+      quiet_hours_enabled,
+      quiet_hours_start,
+      quiet_hours_end
     } = req.body;
 
     // Валидация
@@ -349,6 +353,24 @@ router.put('/preferences', async (req, res) => {
       return res.status(400).json({ 
         error: 'Invalid severity_filter. Must be array of: INFO, WARN, DANGER, CRITICAL' 
       });
+    }
+
+    // Валидация времени тихих часов (принимаем любой формат HH:MM или HH:MM:SS)
+    let qhStart = quiet_hours_start || '23:00';
+    let qhEnd = quiet_hours_end || '08:00';
+    
+    // Обрезать секунды если есть (23:00:00 -> 23:00)
+    if (qhStart && qhStart.length > 5) qhStart = qhStart.substring(0, 5);
+    if (qhEnd && qhEnd.length > 5) qhEnd = qhEnd.substring(0, 5);
+    
+    // Простая проверка формата
+    const isValidTime = (t) => /^\d{1,2}:\d{2}$/.test(t);
+    
+    if (quiet_hours_enabled && (!isValidTime(qhStart) || !isValidTime(qhEnd))) {
+      logger.warn(`Invalid quiet hours format: start=${quiet_hours_start}, end=${quiet_hours_end}, parsed: ${qhStart}, ${qhEnd}`);
+      // Используем значения по умолчанию вместо ошибки
+      qhStart = '23:00';
+      qhEnd = '08:00';
     }
 
     // Получить подписку
@@ -366,21 +388,28 @@ router.put('/preferences', async (req, res) => {
     // Обновить или создать настройки (UPSERT)
     await db.query(`
       INSERT INTO notification_preferences 
-        (subscription_id, severity_filter, notify_on_recovery, notify_on_stale, notify_on_return)
-      VALUES ($1, $2, $3, $4, $5)
+        (subscription_id, severity_filter, notify_on_recovery, notify_on_stale, notify_on_return,
+         quiet_hours_enabled, quiet_hours_start, quiet_hours_end)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       ON CONFLICT (subscription_id) 
       DO UPDATE SET
         severity_filter = EXCLUDED.severity_filter,
         notify_on_recovery = EXCLUDED.notify_on_recovery,
         notify_on_stale = EXCLUDED.notify_on_stale,
         notify_on_return = EXCLUDED.notify_on_return,
+        quiet_hours_enabled = EXCLUDED.quiet_hours_enabled,
+        quiet_hours_start = EXCLUDED.quiet_hours_start,
+        quiet_hours_end = EXCLUDED.quiet_hours_end,
         updated_at = NOW()
     `, [
       subscriptionId,
       severity_filter,
       notify_on_recovery !== undefined ? notify_on_recovery : true,
       notify_on_stale !== undefined ? notify_on_stale : true,
-      notify_on_return !== undefined ? notify_on_return : true
+      notify_on_return !== undefined ? notify_on_return : true,
+      quiet_hours_enabled || false,
+      qhStart,
+      qhEnd
     ]);
 
     logger.info(`Telegram preferences updated: ${shopInn}`);
@@ -391,7 +420,10 @@ router.put('/preferences', async (req, res) => {
         severity_filter,
         notify_on_recovery,
         notify_on_stale,
-        notify_on_return
+        notify_on_return,
+        quiet_hours_enabled,
+        quiet_hours_start: qhStart,
+        quiet_hours_end: qhEnd
       }
     });
 

@@ -116,13 +116,13 @@ export default function AdminRegistrations() {
   return (
     <>
       <Head>
-        <title>Registrations - Admin - Fiscal Monitor</title>
+        <title>Регистрации - Админ - Fiscal Monitor</title>
       </Head>
 
       <AdminLayout>
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Registrations</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Регистрации</h1>
             <p className="text-gray-600">Manage registered clients</p>
           </div>
           <button
@@ -161,7 +161,7 @@ export default function AdminRegistrations() {
                     disabled={editMode}
                   />
                   {editMode && (
-                    <p className="mt-1 text-xs text-gray-500">INN cannot be changed</p>
+                    <p className="mt-1 text-xs text-gray-500">ИНН нельзя изменить</p>
                   )}
                 </div>
                 <div>
@@ -185,7 +185,7 @@ export default function AdminRegistrations() {
                     onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                   />
-                  <span className="ml-2 text-sm text-gray-700">Active</span>
+                  <span className="ml-2 text-sm text-gray-700">Активна</span>
                 </label>
                 <p className="mt-1 text-xs text-gray-500">
                   Inactive registrations cannot be used to issue new tokens
@@ -272,10 +272,10 @@ export default function AdminRegistrations() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">INN</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Title</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Название</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Статус</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Tokens</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Created</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Создано</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Updated</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                 </tr>

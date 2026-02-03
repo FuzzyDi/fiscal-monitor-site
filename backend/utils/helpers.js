@@ -16,14 +16,14 @@ function generateStateKey(shopInn, shopNumber, posNumber) {
 function calculateMaxSeverity(alerts) {
   const order = { CRITICAL: 4, DANGER: 3, WARN: 2, INFO: 1 };
   let max = null;
-
+  
   for (const alert of alerts || []) {
     const severity = alert.severity?.toUpperCase();
     if (order[severity] > (order[max] || 0)) {
       max = severity;
     }
   }
-
+  
   return max;
 }
 
@@ -42,7 +42,7 @@ function validateSnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== 'object') {
     return { valid: false, error: 'Snapshot must be an object' };
   }
-
+  
   if (!snapshot.shopInn || typeof snapshot.shopInn !== 'string' || snapshot.shopInn.trim().length === 0) {
     return { valid: false, error: 'shopInn is required and must be a non-empty string' };
   }
@@ -66,7 +66,7 @@ function validateSnapshot(snapshot) {
   if (warnings.length) {
     return { valid: true, warnings };
   }
-
+  
   return { valid: true };
 }
 
@@ -78,27 +78,10 @@ function generateToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
-/**
- * Extract client IP from request (handles proxies)
- * Checks x-real-ip, x-forwarded-for, then socket.remoteAddress
- */
-function pickClientIp(req) {
-  const xRealIp = req.header('x-real-ip');
-  if (xRealIp) return String(xRealIp).trim();
-  const xff = req.header('x-forwarded-for');
-  if (xff) {
-    // First IP is the original client
-    const first = String(xff).split(',')[0].trim();
-    if (first) return first;
-  }
-  return (req.socket && req.socket.remoteAddress) ? String(req.socket.remoteAddress) : 'unknown';
-}
-
 module.exports = {
   generateStateKey,
   calculateMaxSeverity,
   isStale,
   validateSnapshot,
-  generateToken,
-  pickClientIp
+  generateToken
 };

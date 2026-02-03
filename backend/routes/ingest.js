@@ -2,19 +2,29 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../utils/db');
 const logger = require('../utils/logger');
-const {
-  generateStateKey,
-  calculateMaxSeverity,
-  validateSnapshot,
-  pickClientIp
+const { 
+  generateStateKey, 
+  calculateMaxSeverity, 
+  validateSnapshot 
 } = require('../utils/helpers');
-const {
-  analyzeAndGenerateAlerts,
+const { 
+  analyzeAndGenerateAlerts, 
   generateErrorAlerts,
-  mergeAlerts
+  mergeAlerts 
 } = require('../utils/alert-analyzer');
 
-// maxSeverity helper for comparing two severities (uses calculateMaxSeverity internally)
+function pickClientIp(req) {
+  const xRealIp = req.header('x-real-ip');
+  if (xRealIp) return String(xRealIp).trim();
+  const xff = req.header('x-forwarded-for');
+  if (xff) {
+    // First IP is the original client.
+    const first = String(xff).split(',')[0].trim();
+    if (first) return first;
+  }
+  return (req.socket && req.socket.remoteAddress) ? String(req.socket.remoteAddress) : null;
+}
+
 function maxSeverity(a, b) {
   const order = { CRITICAL: 4, DANGER: 3, WARN: 2, INFO: 1 };
   const an = a ? String(a).toUpperCase() : null;
@@ -55,19 +65,13 @@ function enrichFiscal(fiscal) {
 /**
  * Queue notifications for active Telegram subscriptions
  * Checks cooldowns to avoid spam
- * @param {string} eventType - Type of event: 'new_alert', 'recovery', 'stale', 'return'
  */
-async function queueNotifications(shopInn, stateKey, severity, alerts, shopNumber, posNumber, eventType = 'new_alert') {
+async function queueNotifications(shopInn, stateKey, severity, alerts, shopNumber, posNumber) {
   const COOLDOWN_MINUTES = 30;
-
+  
   // Find active subscriptions with matching severity filter
-  // Also load notification preferences for filtering
   const subsResult = await pool.query(`
-    SELECT ns.id as subscription_id, 
-           np.severity_filter,
-           np.notify_on_recovery,
-           np.notify_on_stale,
-           np.notify_on_return
+    SELECT ns.id as subscription_id, np.severity_filter
     FROM notification_subscriptions ns
     JOIN notification_preferences np ON np.subscription_id = ns.id
     JOIN telegram_connections tc ON tc.subscription_id = ns.id AND tc.is_active = true
@@ -76,51 +80,36 @@ async function queueNotifications(shopInn, stateKey, severity, alerts, shopNumbe
       AND ns.expires_at > NOW()
       AND $2 = ANY(np.severity_filter)
   `, [shopInn, severity]);
-
+  
   if (subsResult.rows.length === 0) {
     return; // No active subscriptions for this INN/severity
   }
-
+  
   // Generate alert summary
   const alertSummary = alerts.slice(0, 3).map(a => a.message || a.type).join('; ');
-
+  
   for (const sub of subsResult.rows) {
-    // Apply notification preferences based on event type
-    if (eventType === 'recovery' && sub.notify_on_recovery === false) {
-      logger.debug(`Skipping recovery notification for subscription ${sub.subscription_id} (disabled in preferences)`);
-      continue;
-    }
-    if (eventType === 'stale' && sub.notify_on_stale === false) {
-      logger.debug(`Skipping stale notification for subscription ${sub.subscription_id} (disabled in preferences)`);
-      continue;
-    }
-    if (eventType === 'return' && sub.notify_on_return === false) {
-      logger.debug(`Skipping return notification for subscription ${sub.subscription_id} (disabled in preferences)`);
-      continue;
-    }
-
     // Check cooldown - don't spam the same terminal
-    // Fixed: Using parameterized query instead of string interpolation
     const cooldownResult = await pool.query(`
       SELECT id FROM notification_cooldowns
       WHERE subscription_id = $1 
         AND state_key = $2
-        AND last_notified_at > NOW() - make_interval(mins => $4)
+        AND last_notified_at > NOW() - INTERVAL '${COOLDOWN_MINUTES} minutes'
         AND last_severity = $3
-    `, [sub.subscription_id, stateKey, severity, COOLDOWN_MINUTES]);
-
+    `, [sub.subscription_id, stateKey, severity]);
+    
     if (cooldownResult.rows.length > 0) {
       logger.debug(`Cooldown active for subscription ${sub.subscription_id}, state ${stateKey}`);
       continue;
     }
-
+    
     // Add to notification queue
     await pool.query(`
       INSERT INTO notification_queue 
         (subscription_id, state_key, severity, event_type, alert_summary, shop_number, pos_number)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-    `, [sub.subscription_id, stateKey, severity, eventType, alertSummary, shopNumber, posNumber]);
-
+      VALUES ($1, $2, $3, 'new_alert', $4, $5, $6)
+    `, [sub.subscription_id, stateKey, severity, alertSummary, shopNumber, posNumber]);
+    
     // Update cooldown
     await pool.query(`
       INSERT INTO notification_cooldowns (subscription_id, state_key, last_notified_at, last_severity)
@@ -128,8 +117,8 @@ async function queueNotifications(shopInn, stateKey, severity, alerts, shopNumbe
       ON CONFLICT (subscription_id, state_key) 
       DO UPDATE SET last_notified_at = NOW(), last_severity = EXCLUDED.last_severity
     `, [sub.subscription_id, stateKey, severity]);
-
-    logger.debug(`Queued ${eventType} notification for subscription ${sub.subscription_id}`);
+    
+    logger.debug(`Queued notification for subscription ${sub.subscription_id}`);
   }
 }
 
@@ -154,7 +143,7 @@ router.post('/snapshot', async (req, res) => {
       const s = String(v).trim();
       return s.length ? s : null;
     };
-
+    
     // Validate snapshot
     const validation = validateSnapshot(snapshot);
     if (!validation.valid) {
@@ -164,7 +153,7 @@ router.post('/snapshot', async (req, res) => {
     if (validation.warnings && validation.warnings.length) {
       logger.warn('Snapshot warnings:', { warnings: validation.warnings });
     }
-
+    
     const {
       shopInn,
       shopNumber,
@@ -187,29 +176,29 @@ router.post('/snapshot', async (req, res) => {
     const posNumberNorm = toIntOrNull(posNumberRaw);
 
     const posIpNorm = toStrOrNull(posIp) || toStrOrNull(pickClientIp(req));
-
+    
     const fiscalEnriched = enrichFiscal(fiscal);
 
     // Server-side alerts from fiscal metrics. Enabled by default - agent sends raw data only.
     const autoAlertsEnabled = String(process.env.AUTO_ALERTS_ENABLED || 'true').toLowerCase() === 'true';
     let autoAlerts = autoAlertsEnabled ? analyzeAndGenerateAlerts(fiscalEnriched) : [];
-
+    
     // Handle agent error (v2 format)
     if (agentError) {
       const errorAlerts = generateErrorAlerts(agentError);
       autoAlerts = [...autoAlerts, ...errorAlerts];
     }
-
+    
     // Merge client alerts with auto-generated alerts
     const alerts = mergeAlerts(clientAlerts, autoAlerts);
-
+    
     // Generate state key (prefer the raw identifiers from agent contract: shopNumber/posNumber are strings)
     const stateKey = generateStateKey(shopInnNorm, shopNumberRaw, posNumberRaw);
-
+    
     // Calculate severity (agent provides top-level severity; we also compute from alerts and take the max)
     const derivedSeverity = calculateMaxSeverity(alerts);
     const severity = maxSeverity(clientSeverity, derivedSeverity);
-
+    
     // Update snapshot with merged alerts + enriched fiscal
     const updatedSnapshot = {
       ...snapshot,
@@ -217,14 +206,14 @@ router.post('/snapshot', async (req, res) => {
       alerts,
       severity
     };
-
+    
     // Check if INN is registered
     const regResult = await pool.query(
       'SELECT is_active FROM registrations WHERE shop_inn = $1',
       [shopInnNorm]
     );
     const isRegistered = regResult.rows.length > 0 && regResult.rows[0].is_active;
-
+    
     // Upsert to fiscal_last_state
     await pool.query(
       `INSERT INTO fiscal_last_state (
@@ -275,18 +264,18 @@ router.post('/snapshot', async (req, res) => {
         logger.warn('Event log insert failed (ignored):', String(e));
       }
     }
-
+    
     logger.info(`Snapshot ingested: ${stateKey} (severity: ${severity || 'none'}, alerts: ${alerts.length}${agentVersion ? ', agent: ' + agentVersion : ''})`);
-
+    
     // Queue notifications for Telegram (async, don't block response)
     if (isRegistered && severity && severity !== 'INFO' && alerts.length > 0) {
       queueNotifications(shopInnNorm, stateKey, severity, alerts, shopNumberNorm, posNumberNorm)
         .catch(err => logger.warn('Failed to queue notifications:', err.message));
     }
-
+    
     // Always return 204
     res.status(204).send();
-
+    
   } catch (err) {
     logger.error('Error processing snapshot:', err);
     // Always return 204 even on error to never block POS
