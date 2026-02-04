@@ -253,7 +253,7 @@ export default function Home() {
                 <Link href="/docs" className="text-gray-500 hover:text-gray-700 text-sm">
                   Документация
                 </Link>
-                <a href="https://t.me/SBG_Rashid" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-700 text-sm">
+                <a href="https://t.me/sbg_support" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-700 text-sm">
                   Поддержка
                 </a>
               </div>

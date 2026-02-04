@@ -172,13 +172,22 @@ function generateErrorAlerts(error) {
  * Объединение алертов от клиента и авто-генерированных
  * Авто-генерированные имеют приоритет
  */
+// Типы алертов, которые игнорируются от клиента (агента)
+// OFFLINE алерты отключены т.к. поле LastOnlineTime ненадёжное
+const IGNORED_ALERT_TYPES = [
+  'OFFLINE_CRITICAL',
+  'OFFLINE_DANGER', 
+  'OFFLINE_WARN',
+  'OFFLINE_INFO'
+];
+
 function mergeAlerts(clientAlerts, autoAlerts) {
   const alertMap = new Map();
   
-  // Добавляем алерты от клиента
+  // Добавляем алерты от клиента (кроме игнорируемых)
   if (clientAlerts && Array.isArray(clientAlerts)) {
     clientAlerts.forEach(alert => {
-      if (alert.type) {
+      if (alert.type && !IGNORED_ALERT_TYPES.includes(alert.type)) {
         alertMap.set(alert.type, alert);
       }
     });

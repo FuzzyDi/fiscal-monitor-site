@@ -10,6 +10,8 @@ export default function AdminState() {
   const [selectedInn, setSelectedInn] = useState('');
   const [selectedShopNumber, setSelectedShopNumber] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [deleteModal, setDeleteModal] = useState({ open: false, state: null });
+  const [deleting, setDeleting] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -96,6 +98,49 @@ export default function AdminState() {
       alert('Не удалось экспортировать данные');
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleDelete = async (deleteHistory = false) => {
+    if (!deleteModal.state) return;
+    
+    try {
+      setDeleting(true);
+      const adminKey = localStorage.getItem('adminKey');
+      if (!adminKey) {
+        router.push('/admin/login');
+        return;
+      }
+
+      const stateKey = deleteModal.state.state_key;
+      const url = `/api/admin/state/${encodeURIComponent(stateKey)}${deleteHistory ? '?deleteHistory=true' : ''}`;
+      
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'X-Admin-Key': adminKey
+        }
+      });
+
+      if (response.status === 401) {
+        localStorage.removeItem('adminKey');
+        router.push('/admin/login');
+        return;
+      }
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Ошибка удаления');
+      }
+
+      // Remove from local state
+      setStates(states.filter(s => s.state_key !== stateKey));
+      setDeleteModal({ open: false, state: null });
+    } catch (error) {
+      console.error('Delete failed:', error);
+      alert(error.message || 'Не удалось удалить кассу');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -311,11 +356,22 @@ export default function AdminState() {
                       <span className="bg-gray-100 px-2 py-0.5 rounded">Касса: {getPosNumber(state)}</span>
                     </div>
                   </div>
-                  {state.severity && (
-                    <span className={`px-4 py-2 rounded-lg text-sm font-bold border-2 ${getSeverityColor(state.severity)}`}>
-                      {state.severity}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {state.severity && (
+                      <span className={`px-4 py-2 rounded-lg text-sm font-bold border-2 ${getSeverityColor(state.severity)}`}>
+                        {state.severity}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => setDeleteModal({ open: true, state })}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Удалить кассу"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
@@ -402,6 +458,53 @@ export default function AdminState() {
             ))}
           </div>
         </div>
+
+        {/* Delete Confirmation Modal */}
+        {deleteModal.open && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">
+                Удалить кассу?
+              </h3>
+              <div className="mb-4 text-sm text-gray-600">
+                <p className="mb-2">
+                  <strong>{deleteModal.state?.shop_name || 'Без названия'}</strong>
+                </p>
+                <p className="font-mono text-xs bg-gray-100 p-2 rounded">
+                  ИНН: {deleteModal.state?.shop_inn} | 
+                  Магазин: {getShopNumber(deleteModal.state)} | 
+                  Касса: {getPosNumber(deleteModal.state)}
+                </p>
+              </div>
+              <p className="text-sm text-gray-500 mb-6">
+                Если агент снова отправит данные, касса появится как новая запись.
+              </p>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => handleDelete(false)}
+                  disabled={deleting}
+                  className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                >
+                  {deleting ? 'Удаление...' : 'Удалить кассу'}
+                </button>
+                <button
+                  onClick={() => handleDelete(true)}
+                  disabled={deleting}
+                  className="w-full px-4 py-2 bg-red-800 text-white rounded-lg hover:bg-red-900 disabled:opacity-50"
+                >
+                  {deleting ? 'Удаление...' : 'Удалить с историей событий'}
+                </button>
+                <button
+                  onClick={() => setDeleteModal({ open: false, state: null })}
+                  disabled={deleting}
+                  className="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 disabled:opacity-50"
+                >
+                  Отмена
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </AdminLayout>
     </>
   );

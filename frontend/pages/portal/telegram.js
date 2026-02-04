@@ -213,7 +213,7 @@ export default function TelegramSettings() {
                 Подписка на Telegram уведомления не активирована.
               </p>
               <p className="text-sm text-gray-600 mb-4">
-                Стоимость: 0000/месяц. Получайте мгновенные уведомления о проблемах с кассами.
+                Стоимость: 1000₽/месяц. Получайте мгновенные уведомления о проблемах с кассами.
               </p>
               
               {status?.request?.status === 'pending' ? (

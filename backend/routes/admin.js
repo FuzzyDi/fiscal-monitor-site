@@ -660,4 +660,70 @@ router.get('/export/state', async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/v1/admin/state/:stateKey
+ * Delete a POS state and optionally its event history
+ */
+router.delete('/state/:stateKey', async (req, res) => {
+  const { stateKey } = req.params;
+  const { deleteHistory } = req.query; // ?deleteHistory=true to also delete events
+  
+  try {
+    // Parse state_key to get components
+    const parts = stateKey.split(':');
+    if (parts.length !== 3) {
+      return res.status(400).json({ error: 'Неверный формат ключа. Ожидается: ИНН:магазин:касса' });
+    }
+    
+    const [shopInn, shopNumber, posNumber] = parts;
+    
+    // Start transaction
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Delete from fiscal_last_state
+      const deleteStateResult = await client.query(
+        'DELETE FROM fiscal_last_state WHERE state_key = $1 RETURNING state_key',
+        [stateKey]
+      );
+      
+      if (deleteStateResult.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Касса не найдена' });
+      }
+      
+      let eventsDeleted = 0;
+      
+      // Optionally delete event history
+      if (deleteHistory === 'true') {
+        const deleteEventsResult = await client.query(
+          'DELETE FROM fiscal_events WHERE shop_inn = $1 AND shop_number = $2 AND pos_number = $3',
+          [shopInn, parseInt(shopNumber), parseInt(posNumber)]
+        );
+        eventsDeleted = deleteEventsResult.rowCount;
+      }
+      
+      await client.query('COMMIT');
+      
+      logger.info(`Deleted POS state: ${stateKey}, events deleted: ${eventsDeleted}`);
+      
+      res.json({ 
+        success: true, 
+        message: 'Касса удалена',
+        stateKey,
+        eventsDeleted
+      });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    logger.error('Error deleting state:', err);
+    res.status(500).json({ error: 'Ошибка при удалении кассы' });
+  }
+});
+
 module.exports = router;
