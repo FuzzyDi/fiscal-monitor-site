@@ -591,7 +591,7 @@ log.level=INFO`}</pre>
             <h3 className="text-xl font-bold mb-2">Нужна помощь?</h3>
             <p className="mb-4 text-blue-100">Свяжитесь с технической поддержкой</p>
             <a
-              href="https://t.me/sbg_support"
+              href="https://t.me/SBG_Rashid"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center px-4 py-2 bg-white text-blue-600 rounded-lg font-medium hover:bg-blue-50 transition-colors"

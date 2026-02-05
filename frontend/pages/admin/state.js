@@ -113,7 +113,7 @@ export default function AdminState() {
       }
 
       const stateKey = deleteModal.state.state_key;
-      const url = `/api/admin/state/${encodeURIComponent(stateKey)}${deleteHistory ? '?deleteHistory=true' : ''}`;
+      const url = `/api/v1/admin/state/${encodeURIComponent(stateKey)}${deleteHistory ? '?deleteHistory=true' : ''}`;
       
       const response = await fetch(url, {
         method: 'DELETE',

@@ -171,6 +171,7 @@ function generateErrorAlerts(error) {
 /**
  * Объединение алертов от клиента и авто-генерированных
  * Авто-генерированные имеют приоритет
+ * ЕДИНЫЙ ИСТОЧНИК ИСТИНЫ - вся фильтрация алертов происходит здесь
  */
 // Типы алертов, которые игнорируются от клиента (агента)
 // OFFLINE алерты отключены т.к. поле LastOnlineTime ненадёжное
@@ -181,13 +182,38 @@ const IGNORED_ALERT_TYPES = [
   'OFFLINE_INFO'
 ];
 
+// Паттерны в тексте алертов, которые нужно игнорировать
+const IGNORED_ALERT_PATTERNS = [
+  /OFD connection/i,
+  /без связи с ОФД/i,
+  /No OFD/i,
+  /Нет связи с ОФД/i
+];
+
+function isIgnoredAlert(alert) {
+  // Проверка по типу
+  if (alert.type && IGNORED_ALERT_TYPES.includes(alert.type)) {
+    return true;
+  }
+  
+  // Проверка по тексту сообщения
+  const message = alert.message || alert.alert_summary || '';
+  for (const pattern of IGNORED_ALERT_PATTERNS) {
+    if (pattern.test(message)) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
 function mergeAlerts(clientAlerts, autoAlerts) {
   const alertMap = new Map();
   
   // Добавляем алерты от клиента (кроме игнорируемых)
   if (clientAlerts && Array.isArray(clientAlerts)) {
     clientAlerts.forEach(alert => {
-      if (alert.type && !IGNORED_ALERT_TYPES.includes(alert.type)) {
+      if (alert.type && !isIgnoredAlert(alert)) {
         alertMap.set(alert.type, alert);
       }
     });

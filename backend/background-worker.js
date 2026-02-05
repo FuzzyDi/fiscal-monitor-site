@@ -159,10 +159,9 @@ async function processNotificationQueue() {
       // Формировать сообщение
       const message = formatMessage(alerts);
 
-      // Если после фильтрации OFFLINE алертов сообщение пустое - пропускаем
+      // Если нет алертов - пропускаем (алерты фильтруются в alert-analyzer.js)
       if (!message) {
-        logger.debug(`No alerts to send after filtering OFFLINE for subscription ${subscription_id}`);
-        // Удаляем из очереди
+        logger.debug(`No alerts to send for subscription ${subscription_id}`);
         await db.query('DELETE FROM notification_queue WHERE subscription_id = $1', [subscription_id]);
         continue;
       }

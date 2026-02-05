@@ -106,24 +106,19 @@ const sender = new TelegramSender();
 
 // Форматирование сообщений (строгий стиль без emoji)
 function formatMessage(alerts) {
-  // Фильтруем OFFLINE алерты (поле LastOnlineTime ненадёжное)
-  const filteredAlerts = alerts.filter(a => 
-    !a.alert_summary?.includes('OFD connection') && 
-    !a.alert_summary?.includes('без связи с ОФД') &&
-    !(a.type && a.type.startsWith('OFFLINE'))
-  );
+  // Алерты уже отфильтрованы в alert-analyzer.js (mergeAlerts)
+  // Здесь только форматирование, без дополнительной фильтрации
   
-  // Если после фильтрации нет алертов - возвращаем null
-  if (filteredAlerts.length === 0) {
+  if (!alerts || alerts.length === 0) {
     return null;
   }
   
-  const count = filteredAlerts.length;
+  const count = alerts.length;
   const portalUrl = process.env.PORTAL_URL || 'https://fiscaldrive.sbg.network';
 
   // Один алерт
   if (count === 1) {
-    const alert = filteredAlerts[0];
+    const alert = alerts[0];
     const severityText = getSeverityText(alert.severity);
     
     return `
@@ -141,7 +136,7 @@ function formatMessage(alerts) {
   if (count <= 5) {
     let message = `НОВЫЕ ПРОБЛЕМЫ (${count})\n\n`;
     
-    filteredAlerts.forEach(alert => {
+    alerts.forEach(alert => {
       const symbol = getSeveritySymbol(alert.severity);
       message += `${symbol} Магазин ${alert.shop_number}, Касса ${alert.pos_number}\n`;
       message += `   ${alert.alert_summary}\n\n`;
@@ -152,8 +147,8 @@ function formatMessage(alerts) {
   }
 
   // Больше 5 алертов (группировка)
-  const bySeverity = groupBySeverity(filteredAlerts);
-  const byShop = groupByShop(filteredAlerts);
+  const bySeverity = groupBySeverity(alerts);
+  const byShop = groupByShop(alerts);
   
   let message = `ТРЕБУЮТ ВНИМАНИЯ (${count} терминалов)\n\n`;
   

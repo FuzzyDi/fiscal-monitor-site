@@ -698,8 +698,8 @@ router.delete('/state/:stateKey', async (req, res) => {
       // Optionally delete event history
       if (deleteHistory === 'true') {
         const deleteEventsResult = await client.query(
-          'DELETE FROM fiscal_events WHERE shop_inn = $1 AND shop_number = $2 AND pos_number = $3',
-          [shopInn, parseInt(shopNumber), parseInt(posNumber)]
+          'DELETE FROM fiscal_events WHERE state_key = $1',
+          [stateKey]
         );
         eventsDeleted = deleteEventsResult.rowCount;
       }
