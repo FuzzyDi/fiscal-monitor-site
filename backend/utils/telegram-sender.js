@@ -105,52 +105,81 @@ class TelegramSender {
 const sender = new TelegramSender();
 
 // Форматирование сообщений (строгий стиль без emoji)
-function formatMessage(alerts) {
-  // Алерты уже отфильтрованы в alert-analyzer.js (mergeAlerts)
-  // Здесь только форматирование, без дополнительной фильтрации
-  
-  if (!alerts || alerts.length === 0) {
+/**
+ * Форматирует алерты для отправки в Telegram
+ * ЕДИНАЯ ЛОГИКА с отображением на странице
+ * @param {Array} queueItems - элементы из очереди уведомлений
+ */
+function formatMessage(queueItems) {
+  if (!queueItems || queueItems.length === 0) {
     return null;
   }
   
-  const count = alerts.length;
   const portalUrl = process.env.PORTAL_URL || 'https://fiscaldrive.sbg.network';
 
-  // Один алерт
-  if (count === 1) {
-    const alert = alerts[0];
-    const severityText = getSeverityText(alert.severity);
+  // Один терминал
+  if (queueItems.length === 1) {
+    const item = queueItems[0];
+    const severityText = getSeverityText(item.severity);
+    
+    // Парсим JSON алертов (единый источник данных с страницей)
+    let alertsList = '';
+    try {
+      const alerts = JSON.parse(item.alert_summary || '[]');
+      alertsList = alerts.map(a => {
+        const msg = a.message || a.type;
+        return `• ${msg}`;
+      }).join('\n');
+    } catch (e) {
+      // Fallback для старого формата (текстовая строка)
+      alertsList = `• ${item.alert_summary}`;
+    }
     
     return `
 АЛЕРТ: ${severityText}
 
-Терминал: Магазин ${alert.shop_number}, Касса ${alert.pos_number}
-Проблема: ${alert.alert_summary}
-Время: ${formatDateTime(new Date())}
+Терминал: Магазин ${item.shop_number}, Касса ${item.pos_number}
+Проблемы:
+${alertsList}
 
+Время: ${formatDateTime(new Date())}
 Подробнее: ${portalUrl}/portal
     `.trim();
   }
 
-  // 2-5 алертов (показываем все)
-  if (count <= 5) {
-    let message = `НОВЫЕ ПРОБЛЕМЫ (${count})\n\n`;
+  // 2-5 терминалов (показываем все)
+  if (queueItems.length <= 5) {
+    let message = `НОВЫЕ ПРОБЛЕМЫ (${queueItems.length} терминалов)\n\n`;
     
-    alerts.forEach(alert => {
-      const symbol = getSeveritySymbol(alert.severity);
-      message += `${symbol} Магазин ${alert.shop_number}, Касса ${alert.pos_number}\n`;
-      message += `   ${alert.alert_summary}\n\n`;
+    queueItems.forEach(item => {
+      const symbol = getSeveritySymbol(item.severity);
+      message += `${symbol} Магазин ${item.shop_number}, Касса ${item.pos_number}\n`;
+      
+      // Парсим JSON алертов
+      try {
+        const alerts = JSON.parse(item.alert_summary || '[]');
+        alerts.slice(0, 3).forEach(a => {
+          const msg = a.message || a.type;
+          message += `   • ${msg}\n`;
+        });
+        if (alerts.length > 3) {
+          message += `   + ещё ${alerts.length - 3}\n`;
+        }
+      } catch (e) {
+        message += `   • ${item.alert_summary}\n`;
+      }
+      message += '\n';
     });
     
     message += `Подробнее: ${portalUrl}/portal`;
     return message.trim();
   }
 
-  // Больше 5 алертов (группировка)
-  const bySeverity = groupBySeverity(alerts);
-  const byShop = groupByShop(alerts);
+  // Больше 5 терминалов (группировка)
+  const bySeverity = groupBySeverity(queueItems);
+  const byShop = groupByShop(queueItems);
   
-  let message = `ТРЕБУЮТ ВНИМАНИЯ (${count} терминалов)\n\n`;
+  let message = `ТРЕБУЮТ ВНИМАНИЯ (${queueItems.length} терминалов)\n\n`;
   
   // По severity
   if (bySeverity.CRITICAL > 0) {
