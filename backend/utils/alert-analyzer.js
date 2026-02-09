@@ -1,60 +1,60 @@
 /**
- * Анализ данных ФМ и генерация алертов
+ * Alert Analyzer - анализирует fiscal данные и генерирует алерты
+ * ЕДИНЫЙ ИСТОЧНИК ИСТИНЫ для фильтрации алертов
  * 
- * Пороги:
+ * Пороги алертов:
  * 
- * Z_REMAINING (смен до замены ФМ):
- *   <= 5   -> CRITICAL
- *   <= 15  -> DANGER  
- *   <= 30  -> WARN
- *   <= 50  -> INFO
+ * Z_REMAINING (оставшиеся Z-отчёты):
+ *   CRITICAL: <= 5
+ *   DANGER: <= 15
+ *   WARN: <= 30
+ *   INFO: <= 50
  * 
- * UNSENT (неотправленные документы в ОФД):
- *   >= 20 -> CRITICAL
- *   >= 10 -> DANGER
- *   >= 5  -> WARN
- *   >= 1  -> INFO
+ * FM_FILL (заполненность памяти ФМ):
+ *   CRITICAL: >= 95%
+ *   DANGER: >= 85%
+ *   WARN: >= 75%
  * 
- * FM_FILL (заполнение памяти ФМ):
- *   >= 30% -> CRITICAL
- *   >= 20% -> DANGER
- *   >= 10% -> WARN
- *   >= 5%  -> INFO
+ * UNSENT (неотправленные документы):
+ *   CRITICAL: >= 20
+ *   DANGER: >= 10
+ *   WARN: >= 5
+ *   INFO: >= 1
  * 
- * OFFLINE (время без связи с ОФД при наличии неотправленных):
- *   >= 720 мин (12ч) -> CRITICAL
- *   >= 240 мин (4ч)  -> DANGER
- *   >= 60 мин (1ч)   -> WARN
+ * OFFLINE (время без связи с ОФД) - ОТКЛЮЧЕНО:
+ *   Поле LastOnlineTime от FiscalDriveService ненадёжно
  */
+
 function analyzeAndGenerateAlerts(fiscal) {
-  if (!fiscal) return [];
-  
   const alerts = [];
   
-  // Z_REMAINING - смен до замены ФМ (1 смена ≈ 1 день)
-  if (fiscal.zRemaining !== undefined && fiscal.zRemaining !== null) {
-    const zRemaining = fiscal.zRemaining;
-    
+  if (!fiscal || typeof fiscal !== 'object') {
+    return alerts;
+  }
+
+  // Z_REMAINING - оставшиеся Z-отчёты
+  const zRemaining = fiscal.zRemaining ?? fiscal.zReportsRemaining ?? fiscal.z_reports_remaining;
+  if (typeof zRemaining === 'number') {
     if (zRemaining <= 5) {
       alerts.push({
         type: 'Z_REMAINING_CRITICAL',
         severity: 'CRITICAL',
         value: zRemaining,
-        message: `КРИТИЧНО: Осталось ${zRemaining} смен! Срочно заменить ФМ!`
+        message: `КРИТИЧНО: Осталось ${zRemaining} смен! Срочно замените ФМ!`
       });
     } else if (zRemaining <= 15) {
       alerts.push({
         type: 'Z_REMAINING_DANGER',
         severity: 'DANGER',
         value: zRemaining,
-        message: `Опасно: Осталось ${zRemaining} смен. Требуется замена ФМ.`
+        message: `Опасно: Осталось ${zRemaining} смен. Запланируйте замену ФМ.`
       });
     } else if (zRemaining <= 30) {
       alerts.push({
         type: 'Z_REMAINING_WARN',
         severity: 'WARN',
         value: zRemaining,
-        message: `Внимание: Осталось ${zRemaining} смен. Закажите замену ФМ.`
+        message: `Внимание: Осталось ${zRemaining} смен.`
       });
     } else if (zRemaining <= 50) {
       alerts.push({
@@ -65,10 +65,37 @@ function analyzeAndGenerateAlerts(fiscal) {
       });
     }
   }
-  
-  // UNSENT - неотправленные документы в ОФД
-  const unsentCount = fiscal.unsentCount;
-  if (unsentCount !== undefined && unsentCount !== null && unsentCount > 0) {
+
+  // FM_FILL - заполненность памяти
+  const fmFillPercent = fiscal.fmFillPercent ?? fiscal.fm_fill_percent;
+  if (typeof fmFillPercent === 'number') {
+    if (fmFillPercent >= 95) {
+      alerts.push({
+        type: 'FM_FILL_CRITICAL',
+        severity: 'CRITICAL',
+        value: fmFillPercent,
+        message: `КРИТИЧНО: Память ФМ заполнена на ${fmFillPercent}%!`
+      });
+    } else if (fmFillPercent >= 85) {
+      alerts.push({
+        type: 'FM_FILL_DANGER',
+        severity: 'DANGER',
+        value: fmFillPercent,
+        message: `Опасно: Память ФМ заполнена на ${fmFillPercent}%.`
+      });
+    } else if (fmFillPercent >= 75) {
+      alerts.push({
+        type: 'FM_FILL_WARN',
+        severity: 'WARN',
+        value: fmFillPercent,
+        message: `Внимание: Память ФМ заполнена на ${fmFillPercent}%.`
+      });
+    }
+  }
+
+  // UNSENT - неотправленные документы
+  const unsentCount = fiscal.unsentCount ?? fiscal.unsent_count ?? 0;
+  if (typeof unsentCount === 'number' && unsentCount > 0) {
     if (unsentCount >= 20) {
       alerts.push({
         type: 'UNSENT_CRITICAL',
@@ -100,41 +127,6 @@ function analyzeAndGenerateAlerts(fiscal) {
     }
   }
 
-  // FM_FILL - заполнение памяти ФМ
-  if (fiscal.fmFillPercent !== undefined && fiscal.fmFillPercent !== null) {
-    const fmFill = fiscal.fmFillPercent;
-    
-    if (fmFill >= 30) {
-      alerts.push({
-        type: 'FM_FILL_CRITICAL',
-        severity: 'CRITICAL',
-        value: fmFill,
-        message: `КРИТИЧНО: Память ФМ заполнена на ${fmFill}%! Касса может остановиться!`
-      });
-    } else if (fmFill >= 20) {
-      alerts.push({
-        type: 'FM_FILL_DANGER',
-        severity: 'DANGER',
-        value: fmFill,
-        message: `Опасно: Память ФМ заполнена на ${fmFill}%. Проверьте связь с ОФД.`
-      });
-    } else if (fmFill >= 10) {
-      alerts.push({
-        type: 'FM_FILL_WARN',
-        severity: 'WARN',
-        value: fmFill,
-        message: `Внимание: Память ФМ заполнена на ${fmFill}%.`
-      });
-    } else if (fmFill >= 5) {
-      alerts.push({
-        type: 'FM_FILL_INFO',
-        severity: 'INFO',
-        value: fmFill,
-        message: `Инфо: Память ФМ использована на ${fmFill}%.`
-      });
-    }
-  }
-  
   // OFFLINE алерт ОТКЛЮЧЕН
   // Причина: поле LastOnlineTime из FiscalDriveService НЕ отражает реальную связь с ОФД
   // Факты:
@@ -143,28 +135,22 @@ function analyzeAndGenerateAlerts(fiscal) {
   // Вывод: это поле означает что-то другое (не время последней успешной отправки)
   // 
   // Для определения проблем со связью используйте алерт UNSENT (неотправленные документы)
-  
+
   return alerts;
 }
 
 /**
- * Генерация алертов для ошибок агента
+ * Generate alerts from agent error
  */
 function generateErrorAlerts(error) {
   if (!error) return [];
   
-  const errorMessages = {
-    'RPC_ERROR': 'Ошибка связи с FiscalDriveService',
-    'NO_FISCAL_DRIVE': 'Фискальный модуль не найден',
-    'FM_NOT_FOUND': 'Фискальный модуль не обнаружен'
-  };
-  
-  const message = errorMessages[error.type] || error.message || 'Неизвестная ошибка';
+  const errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
   
   return [{
-    type: error.type || 'AGENT_ERROR',
-    severity: 'CRITICAL',
-    message: `${message}: ${error.message || ''}`
+    type: 'AGENT_ERROR',
+    severity: 'DANGER',
+    message: `Ошибка агента: ${errorMessage}`
   }];
 }
 
@@ -173,6 +159,7 @@ function generateErrorAlerts(error) {
  * Авто-генерированные имеют приоритет
  * ЕДИНЫЙ ИСТОЧНИК ИСТИНЫ - вся фильтрация алертов происходит здесь
  */
+
 // Типы алертов, которые игнорируются от клиента (агента)
 // OFFLINE алерты отключены т.к. поле LastOnlineTime ненадёжное
 const IGNORED_ALERT_TYPES = [
@@ -197,7 +184,7 @@ function isIgnoredAlert(alert) {
   }
   
   // Проверка по тексту сообщения
-  const message = alert.message || alert.alert_summary || '';
+  const message = alert.message || '';
   for (const pattern of IGNORED_ALERT_PATTERNS) {
     if (pattern.test(message)) {
       return true;
